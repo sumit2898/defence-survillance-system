@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import { BootLoader } from "@/components/BootLoader";
+import { ThemeProvider } from "@/components/theme-provider";
 
 import Home from "@/pages/Home";
 import Dashboard from "@/pages/Dashboard";
@@ -45,13 +46,15 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <AnimatePresence>
-          {!booted && <BootLoader onComplete={() => setBooted(true)} />}
-        </AnimatePresence>
-        {booted && <Router />}
-      </TooltipProvider>
+      <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+        <TooltipProvider>
+          <Toaster />
+          <AnimatePresence>
+            {!booted && <BootLoader onComplete={() => setBooted(true)} />}
+          </AnimatePresence>
+          {booted && <Router />}
+        </TooltipProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

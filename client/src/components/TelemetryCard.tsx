@@ -31,11 +31,21 @@ export function TelemetryCard({
             {/* Decorative Corner */}
             <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-white/20 rounded-tr-sm" />
 
-            <div className="flex items-center justify-between text-muted-foreground">
-                <span className="text-[10px] uppercase tracking-wider font-semibold">{label}</span>
-                {Icon && <Icon className={cn("h-3 w-3",
-                    status === "critical" ? "text-red-400" : "text-primary/70"
-                )} />}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    {/* Enterprise App Icon Container */}
+                    {Icon && (
+                        <div className={cn(
+                            "w-10 h-10 rounded-xl flex items-center justify-center border shadow-lg transition-all",
+                            status === "normal" && "bg-zinc-800 border-white/5 text-zinc-400 group-hover:bg-zinc-700 group-hover:text-white group-hover:border-white/20",
+                            status === "warning" && "bg-orange-500/10 border-orange-500/20 text-orange-500",
+                            status === "critical" && "bg-red-500/10 border-red-500/20 text-red-500 box-shadow-[0_0_15px_rgba(239,68,68,0.2)]"
+                        )}>
+                            <Icon className="h-5 w-5" />
+                        </div>
+                    )}
+                    <span className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">{label}</span>
+                </div>
             </div>
 
             <div className="flex items-baseline gap-1">

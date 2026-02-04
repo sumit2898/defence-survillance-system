@@ -132,7 +132,10 @@ export default function Devices() {
                 </button>
               ))}
             </div>
-            <button className="p-3 border border-white/10 rounded-lg hover:bg-green-500/10 bg-black/80 text-green-500 transition-all hover:border-green-500/30 shadow-xl">
+            <button
+              onClick={() => handleSimulatedAction("SCAN_NEW_ASSETS")}
+              className="p-3 border border-white/10 rounded-lg hover:bg-green-500/10 bg-black/80 text-green-500 transition-all hover:border-green-500/30 shadow-xl"
+            >
               <Plus className="h-5 w-5" />
             </button>
           </div>
@@ -400,13 +403,22 @@ export default function Devices() {
                       </div>
 
                       <div className="flex flex-col gap-2">
-                        <button className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-black text-white uppercase tracking-widest transition-all flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => handleSimulatedAction("REBOOT_SYSTEM_ROOT")}
+                          className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-black text-white uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                        >
                           <RefreshCw className="h-3 w-3" /> Reboot_System
                         </button>
-                        <button className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-black text-white uppercase tracking-widest transition-all flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => handleSimulatedAction("ICMP_PING_SEQUENCE")}
+                          className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-black text-white uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                        >
                           <Zap className="h-3 w-3" /> Ping_Test
                         </button>
-                        <button className="w-full py-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-xl text-[10px] font-black text-red-500 uppercase tracking-widest transition-all flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => handleSimulatedAction("EMERGENCY_HALT")}
+                          className="w-full py-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-xl text-[10px] font-black text-red-500 uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                        >
                           <Power className="h-3 w-3" /> Emergency_Stop
                         </button>
                       </div>

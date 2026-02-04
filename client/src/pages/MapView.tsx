@@ -1,10 +1,10 @@
 import { Layout } from "@/components/Layout";
 import { PageTransition } from "@/components/ui/PageTransition";
-import { MapBackground } from "@/components/MapBackground";
-import { WeatherLayer, HeatmapLayer, ZoneLayer, IndianBorderLayer } from "@/components/MapLayers";
-import { RealTacticalMap } from "@/components/RealTacticalMap";
+// MapBackground removed
+import { WeatherLayer, HeatmapLayer, ZoneLayer, IndianBorderLayer, SatelliteLayer } from "@/components/MapLayers";
+import { TacticalLeafletMap } from "@/components/TacticalLeafletMap";
 import { useDevices } from "@/hooks/use-devices";
-import { MapPin, Navigation, Scan, Locate, Layers, Crosshair, ZoomIn, ZoomOut, CloudRain, Flame, ShieldAlert, Ruler, MousePointer2, Map as MapIcon, Globe } from "lucide-react";
+import { MapPin, Navigation, Scan, Locate, Layers, Crosshair, ZoomIn, ZoomOut, CloudRain, Flame, ShieldAlert, Ruler, MousePointer2, Map as MapIcon, Globe, Satellite } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -13,162 +13,185 @@ export default function MapView() {
     const { data: devices } = useDevices();
     const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
 
-    // Map Viewport State
-    const [scale, setScale] = useState(1);
-    const [position, setPosition] = useState({ x: 0, y: 0 });
-    const [isDragging, setIsDragging] = useState(false);
-    const dragStart = useRef({ x: 0, y: 0 });
-    const containerRef = useRef<HTMLDivElement>(null);
-
     // Layers State
     const [layers, setLayers] = useState({
         weather: false,
         heatmap: false,
         zones: true,
         borders: true,
-        satellite: false
+        satellite: false,
+        terrain: false
     });
 
-    // Measurement Tool State
+    // Distance Tool Placeholder (Future: Implement via Leaflet.Draw or similar)
     const [measureMode, setMeasureMode] = useState(false);
-    const [measurePoints, setMeasurePoints] = useState<{ x: number, y: number }[]>([]);
 
-    // Handle Zoom
-    const handleWheel = (e: React.WheelEvent) => {
-        const newScale = Math.min(Math.max(scale - e.deltaY * 0.001, 0.5), 3);
-        setScale(newScale);
+    // Zoom State (Command Pattern to control Map from UI)
+    const [zoomLevel, setZoomLevel] = useState(5);
+    const [zoomCmd, setZoomCmd] = useState<{ action: 'in' | 'out', ts: number } | null>(null);
+
+    const handleZoom = (dir: 'in' | 'out') => {
+        setZoomCmd({ action: dir, ts: Date.now() });
+        setZoomLevel(prev => dir === 'in' ? prev + 1 : prev - 1);
     };
 
-    // Handle Pan
-    const handleMouseDown = (e: React.MouseEvent) => {
-        if (measureMode) return;
-        setIsDragging(true);
-        dragStart.current = { x: e.clientX - position.x, y: e.clientY - position.y };
+    // Device Link Logic
+    const handleEstablishLink = () => {
+        const deviceName = devices?.find(d => d.id.toString() === selectedDevice)?.name || "DEVICE";
+        alert(`ESTABLISHING SECURE DATALINK TO [${deviceName}]...\n\n...ENCRYPTED CHANNEL VERIFIED.\n...STREAM OPTIMIZED.`);
     };
 
-    const handleMouseMove = (e: React.MouseEvent) => {
-        if (isDragging) {
-            setPosition({
-                x: e.clientX - dragStart.current.x,
-                y: e.clientY - dragStart.current.y
-            });
+    // --- Search & Routing State ---
+    const [searchQuery, setSearchQuery] = useState("");
+    const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [isRouting, setIsRouting] = useState(false);
+    const [mapFocus, setMapFocus] = useState<{ lat: number, lng: number, zoom: number } | null>(null);
+
+    // Simulate Search (Connect to Real Backend)
+    const handleSearch = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            let lat, lng;
+
+            if (routeSource === 'bhuvan') {
+                // Official Bhuvan Search
+                console.log(`Searching via Bhuvan: ${searchQuery}`);
+                const res = await fetch(`/api/gis/bhuvan/search?q=${encodeURIComponent(searchQuery)}`);
+                const data = await res.json();
+                if (data && data.length > 0) {
+                    lat = data[0].lat;
+                    lng = data[0].lon;
+                    alert(`Bhuvan Found: ${data[0].name}`);
+                }
+            } else {
+                // Tactical Geoapify Search
+                const res = await fetch(`/api/gis/search?q=${encodeURIComponent(searchQuery)}`);
+                const data = await res.json();
+                if (data.features && data.features.length > 0) {
+                    const feat = data.features[0];
+                    [lng, lat] = feat.geometry.coordinates; // GeoJSON is [lng, lat]
+                }
+            }
+
+            if (lat && lng) {
+                console.log("Flying to:", lat, lng);
+                setMapFocus({ lat, lng, zoom: 14 });
+                if (isRouting) {
+                    calculateRoute({ lat, lng });
+                }
+            } else {
+                alert("Sector Unknown / Not Found");
+            }
+        } catch (err) {
+            console.error(err);
         }
     };
 
-    const handleMouseUp = () => setIsDragging(false);
+    // ... (rest of code)
 
-    // Handle Measurement Click
-    const handleMapClick = (e: React.MouseEvent) => {
-        if (!measureMode || !containerRef.current) return;
+    // Handle Map Click for Analysis
+    const handleAnalysisClick = async (lat: number, lng: number) => {
+        if (!analysisMode) return;
 
-        const rect = containerRef.current.getBoundingClientRect();
-        // Calculate relative coordinates accounting for scale and position
-        const x = (e.clientX - rect.left - position.x) / scale;
-        const y = (e.clientY - rect.top - position.y) / scale;
+        // Use resilient fetching - if one fails, others should still show
+        const fetchSafe = async (url: string) => {
+            try {
+                const res = await fetch(url);
+                if (!res.ok) throw new Error("Fetch failed");
+                return await res.json();
+            } catch (e) {
+                console.warn(`Failed to fetch ${url}`, e);
+                return {}; // Return empty object on fail
+            }
+        };
 
-        setMeasurePoints(prev => {
-            if (prev.length >= 2) return [{ x, y }];
-            return [...prev, { x, y }];
-        });
+        try {
+            console.log(`Analyzing: ${lat}, ${lng}`);
+            const [lulc, elev, village] = await Promise.all([
+                fetchSafe(`/api/gis/bhuvan/lulc?lat=${lat}&lon=${lng}`),
+                fetchSafe(`/api/gis/bhuvan/elevation?lat=${lat}&lon=${lng}`),
+                fetchSafe(`/api/gis/bhuvan/reverse?lat=${lat}&lon=${lng}`)
+            ]);
+
+            const result = { ...lulc, ...elev, ...village };
+            // Ensure at least some data exists to show the card
+            if (Object.keys(result).length > 0) {
+                setAnalysisResult(result);
+            }
+            console.log("Analysis Result:", result);
+        } catch (e) {
+            console.error("Analysis Critical Failure", e);
+        }
+    }
+
+    // GIS Modes
+    const [analysisMode, setAnalysisMode] = useState(false);
+    const [routeSource, setRouteSource] = useState<'geoapify' | 'bhuvan'>('geoapify');
+    const [analysisResult, setAnalysisResult] = useState<any>(null);
+
+    // Restore Missing State
+    const [routeData, setRouteData] = useState<any>(null);
+    const [currentLocation, setCurrentLocation] = useState<{ lat: number, lng: number } | null>(null);
+
+    // Calculate Route from "Base" (Simulated Fixed Point for Demo) to Target
+    const calculateRoute = async (destination: { lat: number, lng: number }) => {
+        // Simulated "Current Location" (e.g., Delhi HQ) or Real GPS
+        const start = currentLocation || { lat: 28.6139, lng: 77.2090 };
+        const endpoint = routeSource === 'geoapify' ? '/api/gis/route' : '/api/gis/bhuvan/route';
+
+        try {
+            console.log(`Calculating Route via ${routeSource}...`);
+            const res = await fetch(`${endpoint}?start=${start.lat},${start.lng}&end=${destination.lat},${destination.lng}`);
+            const data = await res.json();
+
+            if (data.features && data.features.length > 0) {
+                setRouteData(data.features[0].geometry);
+                alert(`Route Calculated (${routeSource.toUpperCase()}): ${(data.features[0].properties.distance / 1000).toFixed(2)} km`);
+            } else {
+                alert("No Route Found / Bhuvan Service Unavailable");
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Routing Failed");
+        }
     };
 
-    // Calculate distance (simulated units)
-    const distance = measurePoints.length === 2
-        ? Math.round(Math.sqrt(Math.pow(measurePoints[1].x - measurePoints[0].x, 2) + Math.pow(measurePoints[1].y - measurePoints[0].y, 2)))
-        : 0;
-
-    // Simulated markers relative to center
-    // Real markers from Backend Data
-    const markers = devices?.map((d) => ({
-        ...d,
-        x: d.x ?? 2500, // Default to center if null
-        y: d.y ?? 2500,
-    })) || [];
+    // Get Real User Location
+    const handleLocateMe = () => {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition((position) => {
+                const { latitude, longitude } = position.coords;
+                // console.log("Locate Me:", latitude, longitude);
+                setCurrentLocation({ lat: latitude, lng: longitude });
+                setMapFocus({ lat: latitude, lng: longitude, zoom: 15 });
+            }, (error) => {
+                console.warn("Geolocation Warning:", error.message);
+                // Removed alert per user request
+            }, { enableHighAccuracy: true, timeout: 10000 });
+        }
+    };
 
     return (
         <Layout className="h-full relative overflow-hidden p-0 select-none">
             {/* Main Map Container */}
-            <div
-                ref={containerRef}
-                className={cn("absolute inset-0 cursor-crosshair active:cursor-grabbing", isDragging ? "cursor-grabbing" : "")}
-                onWheel={handleWheel}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-                onClick={handleMapClick}
-            >
-                {/* Transform Layer */}
-                <div
-                    style={{
-                        transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-                        transformOrigin: '0 0',
-                        width: '100%', height: '100%'
-                    }}
-                    className="relative transition-transform duration-75 ease-out will-change-transform"
-                >
-                    {/* Infinite Grid Background for Context */}
-                    <div className="absolute -top-[2000px] -left-[2000px] w-[5000px] h-[5000px]">
-                        <MapBackground />
+            <div className="absolute inset-0 z-0">
+                <TacticalLeafletMap
+                    active={true}
+                    layers={layers}
+                    focusTarget={mapFocus}
+                    routeData={routeData}
+                    currentLocation={currentLocation}
+                    onMapClick={handleAnalysisClick}
+                    measureMode={measureMode}
+                    zoomCmd={zoomCmd}
+                />
 
-                        {/* Map Layers */}
-                        <RealTacticalMap active={layers.satellite} />
-                        {!layers.satellite && <IndianBorderLayer active={layers.borders} />}
-                        <WeatherLayer active={layers.weather} />
-                        <HeatmapLayer active={layers.heatmap} />
-                        <ZoneLayer active={layers.zones} />
-
-                        {/* Measurements Line */}
-                        {measurePoints.length > 0 && (
-                            <svg className="absolute inset-0 w-full h-full pointer-events-none z-30">
-                                {measurePoints.map((p, i) => (
-                                    <circle key={i} cx={p.x} cy={p.y} r={4 / scale} fill="#22c55e" />
-                                ))}
-                                {measurePoints.length === 2 && (
-                                    <>
-                                        <line x1={measurePoints[0].x} y1={measurePoints[0].y} x2={measurePoints[1].x} y2={measurePoints[1].y} stroke="#22c55e" strokeWidth={2 / scale} strokeDasharray="5 5" />
-                                        <text x={(measurePoints[0].x + measurePoints[1].x) / 2} y={(measurePoints[0].y + measurePoints[1].y) / 2 - 10} fill="#22c55e" fontSize={14 / scale} fontWeight="bold">
-                                            {distance}m
-                                        </text>
-                                    </>
-                                )}
-                            </svg>
-                        )}
-
-                        {/* Interactive Markers */}
-                        {markers.map((marker) => (
-                            <motion.div
-                                key={marker.id}
-                                className="absolute -translate-x-1/2 -translate-y-1/2 group z-40"
-                                style={{ left: marker.x, top: marker.y }}
-                                onClick={(e) => { e.stopPropagation(); setSelectedDevice(marker.id.toString()); }}
-                            >
-                                <div className={cn(
-                                    "relative flex items-center justify-center transition-all duration-300",
-                                    scale < 0.8 ? "w-4 h-4" : "w-10 h-10"
-                                )}>
-                                    {/* Pulse Ring */}
-                                    <div className="absolute inset-[-50%] border border-green-500/30 rounded-full animate-ping" />
-
-                                    {/* Icon Box */}
-                                    <div className={cn(
-                                        "w-full h-full bg-black/80 backdrop-blur-md border border-white/20 flex items-center justify-center rounded-lg hover:border-green-500 hover:bg-green-500/20 transition-all",
-                                        selectedDevice === marker.id.toString() ? "border-green-500 bg-green-500/20 shadow-[0_0_20px_#22c55e]" : ""
-                                    )}>
-                                        <div className={cn("rounded-full bg-current", scale < 0.8 ? "w-2 h-2" : "w-3 h-3", marker.status === 'online' ? "text-green-500" : "text-red-500")} />
-                                    </div>
-
-                                    {/* Label (Only visible when zoomed in) */}
-                                    {scale > 0.8 && (
-                                        <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-black/80 px-2 py-1 rounded border border-white/10 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                                            <span className="text-[10px] text-white font-mono">{marker.name}</span>
-                                        </div>
-                                    )}
-                                </div>
-                            </motion.div>
-                        ))}
-                    </div>
-                </div>
+                {/* Visual Overlays (Non-Leaflet) */}
+                <WeatherLayer active={layers.weather} />
+                <HeatmapLayer active={layers.heatmap} />
+                <SatelliteLayer active={layers.satellite} />
+                <ZoneLayer active={layers.zones} />
+                <IndianBorderLayer active={layers.borders} />
             </div>
 
             {/* UI Overlay (Fixed) */}
@@ -182,18 +205,33 @@ export default function MapView() {
                             TACTICAL_MAP_V2
                         </h1>
                         <div className="flex gap-4 text-[9px] font-mono text-zinc-500 uppercase tracking-widest">
-                            <span>ZM: {(scale * 100).toFixed(0)}%</span>
-                            <span>POS: {position.x.toFixed(0)}, {position.y.toFixed(0)}</span>
+                            <span>ZM: {zoomLevel}X</span>
+                            <span>POS: TACTICAL_GRID</span>
                         </div>
                     </div>
+
+                    {/* Search Bar */}
+                    <form onSubmit={handleSearch} className="bg-black/80 backdrop-blur-xl border border-white/10 p-2 rounded-xl flex gap-2 pointer-events-auto">
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="SEARCH_SECTOR..."
+                            className="bg-transparent border-none text-xs font-mono text-white placeholder:text-zinc-600 focus:outline-none w-48 px-2"
+                        />
+                        <button type="submit" className="p-2 bg-white/10 hover:bg-white/20 rounded text-green-500">
+                            <MapIcon className="h-4 w-4" />
+                        </button>
+                    </form>
 
                     <div className="flex gap-2 bg-black/80 backdrop-blur-xl border border-white/10 p-2 rounded-xl">
                         {[
                             { id: 'satellite', icon: Globe, label: 'SAT_UPLINK' },
-                            { id: 'borders', icon: MapIcon, label: 'GEO_BORDER' },
+                            { id: 'terrain', icon: Satellite, label: 'ISRO_SAT' },
                             { id: 'weather', icon: CloudRain, label: 'WX_RADAR' },
                             { id: 'heatmap', icon: Flame, label: 'TH_RML' },
-                            { id: 'zones', icon: ShieldAlert, label: 'RES_ZONE' }
+                            { id: 'zones', icon: ShieldAlert, label: 'RES_ZONE' },
+                            { id: 'borders', icon: MapIcon, label: 'INDIA_GRID' }
                         ].map(layer => (
                             <button
                                 key={layer.id}
@@ -213,7 +251,6 @@ export default function MapView() {
                         <button
                             onClick={() => {
                                 setMeasureMode(!measureMode);
-                                setMeasurePoints([]);
                             }}
                             className={cn(
                                 "p-3 rounded-lg transition-all border",
@@ -223,6 +260,19 @@ export default function MapView() {
                             )}
                         >
                             <Ruler className="h-5 w-5" />
+                        </button>
+                        <div className="w-[1px] bg-white/10 mx-1" />
+                        <button
+                            onClick={() => setIsRouting(!isRouting)}
+                            className={cn(
+                                "p-3 rounded-lg transition-all border",
+                                isRouting
+                                    ? "bg-orange-500/20 border-orange-500/50 text-orange-500"
+                                    : "bg-transparent border-transparent text-zinc-500 hover:text-white"
+                            )}
+                            title="TACTICAL_ROUTE"
+                        >
+                            <Navigation className="h-5 w-5" />
                         </button>
                     </div>
                 </div>
@@ -243,19 +293,50 @@ export default function MapView() {
                                     <h3 className="font-black text-white uppercase">{devices?.find(d => d.id.toString() === selectedDevice)?.name}</h3>
                                     <button onClick={() => setSelectedDevice(null)} className="text-zinc-500 hover:text-white">✕</button>
                                 </div>
-                                <div className="grid grid-cols-2 gap-4 text-xs font-mono mb-4">
-                                    <div className="bg-white/5 p-2 rounded">
-                                        <span className="text-zinc-500 block text-[8px] uppercase">Status</span>
-                                        <span className="text-green-500">ONLINE</span>
-                                    </div>
-                                    <div className="bg-white/5 p-2 rounded">
-                                        <span className="text-zinc-500 block text-[8px] uppercase">Battery</span>
-                                        <span className="text-white">98%</span>
-                                    </div>
-                                </div>
-                                <button className="w-full py-2 bg-green-500 text-black font-bold text-xs uppercase rounded hover:bg-green-400 font-mono">
+                                {/* ... existing device details code ... */}
+                                <button onClick={handleEstablishLink} className="w-full py-2 bg-green-500 text-black font-bold text-xs uppercase rounded hover:bg-green-400 font-mono">
                                     ESTABLISH_LINK
                                 </button>
+                            </motion.div>
+                        ) : analysisResult ? (
+                            <motion.div
+                                key="analysis"
+                                initial={{ y: 50, opacity: 0 }}
+                                animate={{ y: 0, opacity: 1 }}
+                                exit={{ y: 50, opacity: 0 }}
+                                className="bg-black/90 backdrop-blur-2xl border border-blue-500/30 p-6 rounded-2xl w-80 shadow-2xl relative overflow-hidden"
+                            >
+                                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent animate-pulse" />
+                                <div className="flex justify-between items-start mb-4">
+                                    <h3 className="font-black text-blue-400 uppercase tracking-widest flex gap-2 items-center">
+                                        <Crosshair className="w-4 h-4" /> TERRAIN_INTEL
+                                    </h3>
+                                    <button onClick={() => setAnalysisResult(null)} className="text-zinc-500 hover:text-white">✕</button>
+                                </div>
+                                <div className="space-y-3 font-mono text-xs">
+                                    <div className="flex justify-between border-b border-white/10 pb-1">
+                                        <span className="text-zinc-500">CLASS</span>
+                                        <span className="text-white font-bold">{analysisResult.class}</span>
+                                    </div>
+                                    <div className="flex justify-between border-b border-white/10 pb-1">
+                                        <span className="text-zinc-500">RISK</span>
+                                        <span className={cn("font-bold", analysisResult.risk_factor.includes("High") ? "text-red-500" : "text-green-500")}>
+                                            {analysisResult.risk_factor}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between border-b border-white/10 pb-1">
+                                        <span className="text-zinc-500">ELEVATION</span>
+                                        <span className="text-blue-400">{analysisResult.elevation_m?.toFixed(1)} M (MSL)</span>
+                                    </div>
+                                    <div className="flex justify-between border-b border-white/10 pb-1">
+                                        <span className="text-zinc-500">VILLAGE</span>
+                                        <span className="text-orange-400">{analysisResult.village || "N/A"}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-zinc-500">SOURCE</span>
+                                        <span className="text-zinc-400">BHUVAN_ISRO</span>
+                                    </div>
+                                </div>
                             </motion.div>
                         ) : (
                             <div />
@@ -264,28 +345,31 @@ export default function MapView() {
 
                     {/* Minimap & HUD Controls */}
                     <div className="flex gap-4 items-end">
+                        {/* GIS Modes Switcher */}
                         <div className="bg-black/80 backdrop-blur-xl border border-white/10 rounded-xl p-2 flex flex-col gap-2">
-                            <button onClick={() => setScale(s => Math.min(s + 0.5, 3))} className="p-2 hover:bg-white/10 rounded text-zinc-400 hover:text-white"><ZoomIn className="h-5 w-5" /></button>
-                            <button onClick={() => setScale(s => Math.max(s - 0.5, 0.5))} className="p-2 hover:bg-white/10 rounded text-zinc-400 hover:text-white"><ZoomOut className="h-5 w-5" /></button>
-                            <button onClick={() => { setPosition({ x: 0, y: 0 }); setScale(1); }} className="p-2 hover:bg-white/10 rounded text-zinc-400 hover:text-white"><Locate className="h-5 w-5" /></button>
+                            <button
+                                onClick={() => setAnalysisMode(!analysisMode)}
+                                className={cn("p-2 rounded transition-colors", analysisMode ? "bg-blue-500 text-white" : "text-zinc-400 hover:text-white hover:bg-white/10")}
+                                title="Intel Mode (Click to Analyze)"
+                            >
+                                <Crosshair className="h-5 w-5" />
+                            </button>
+                            <button
+                                onClick={() => setRouteSource(s => s === 'geoapify' ? 'bhuvan' : 'geoapify')}
+                                className={cn("p-2 rounded transition-colors text-xs font-bold font-mono", routeSource === 'bhuvan' ? "bg-orange-600 text-white" : "text-zinc-400 hover:text-white hover:bg-white/10")}
+                                title={`Route Source: ${routeSource.toUpperCase()}`}
+                            >
+                                {routeSource === 'bhuvan' ? 'BHV' : 'GPY'}
+                            </button>
                         </div>
 
-                        {/* Minimap Simulation */}
-                        <div className="w-48 h-48 bg-black/90 border border-white/20 rounded-2xl relative overflow-hidden shadow-2xl">
-                            <div className="absolute inset-0 opacity-30">
-                                <MapBackground />
-                            </div>
-                            {/* Viewport Indicator */}
-                            <div
-                                className="absolute border-2 border-green-500/50 bg-green-500/10"
-                                style={{
-                                    width: `${Math.min(100 / scale, 100)}%`,
-                                    height: `${Math.min(100 / scale, 100)}%`,
-                                    top: '50%', left: '50%',
-                                    transform: `translate(-50%, -50%) translate(${-position.x / 10}px, ${-position.y / 10}px)`
-                                }}
-                            />
+                        <div className="bg-black/80 backdrop-blur-xl border border-white/10 rounded-xl p-2 flex flex-col gap-2">
+                            <button onClick={() => handleZoom('in')} className="p-2 hover:bg-white/10 rounded text-zinc-400 hover:text-white"><ZoomIn className="h-5 w-5" /></button>
+                            <button onClick={() => handleZoom('out')} className="p-2 hover:bg-white/10 rounded text-zinc-400 hover:text-white"><ZoomOut className="h-5 w-5" /></button>
+                            <button onClick={handleLocateMe} className="p-2 hover:bg-white/10 rounded text-zinc-400 hover:text-white"><Locate className="h-5 w-5" /></button>
                         </div>
+
+                        {/* Minimap Removed as per request */}
                     </div>
                 </div>
 

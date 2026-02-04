@@ -1,9 +1,13 @@
 import { Layout } from "@/components/Layout";
 import { StatsCard } from "@/components/StatsCard";
 import { FeedPlayer } from "@/components/FeedPlayer";
-import { MapBackground } from "@/components/MapBackground";
+// MapBackground removed
 import { TelemetryCard } from "@/components/TelemetryCard";
 import { SecurityScore } from "@/components/SecurityScore";
+import React from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { NetworkTraffic } from "@/components/NetworkTraffic";
 import { useAlerts } from "@/hooks/use-alerts";
 import { useDevices } from "@/hooks/use-devices";
@@ -15,6 +19,8 @@ import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { TiltCard } from "@/components/TiltCard";
+import { GlitchText } from "@/components/GlitchText";
+import { BootScreen } from "@/components/BootScreen";
 
 const mockActivityData = Array.from({ length: 24 }, (_, i) => ({
   time: `${i}:00`,
@@ -24,7 +30,7 @@ const mockActivityData = Array.from({ length: 24 }, (_, i) => ({
 }));
 
 const mockThermalData = Array.from({ length: 12 }, (_, i) => ({
-  node: `NODE_${i.toString().padStart(2, '0')}`,
+  node: `NODE_${i.toString().padStart(2, '0')} `,
   temp: Math.floor(Math.random() * 20) + 35,
   load: Math.floor(Math.random() * 40) + 20,
 }));
@@ -37,6 +43,7 @@ const pieData = [
 ];
 
 export default function Dashboard() {
+  const [showBoot, setShowBoot] = React.useState(true);
   const { data: alerts } = useAlerts();
   const { data: devices } = useDevices();
   const { data: logs } = useLogs();
@@ -48,6 +55,10 @@ export default function Dashboard() {
 
   return (
     <Layout className="flex flex-col p-6 pointer-events-auto border-none">
+      <AnimatePresence>
+        {showBoot && <BootScreen onComplete={() => setShowBoot(false)} />}
+      </AnimatePresence>
+
       {/* Cinematic Background Layer */}
       <div className="fixed inset-0 pointer-events-none z-0">
         <div className="absolute inset-x-0 top-0 h-96 bg-gradient-to-b from-green-500/[0.05] to-transparent" />
@@ -65,6 +76,7 @@ export default function Dashboard() {
         <motion.header
           initial={{ y: -50, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
           className="sticky top-6 z-50 bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6 flex justify-between items-center shadow-2xl mb-12"
         >
           <div className="flex items-center gap-8">
@@ -72,15 +84,19 @@ export default function Dashboard() {
               <div className="absolute inset-0 bg-green-500/20 blur-md animate-pulse" />
               <motion.div
                 whileHover={{ rotate: 90 }}
-                className="relative w-14 h-14 bg-zinc-900 border border-white/10 rounded-xl flex items-center justify-center cursor-crosshair"
+                className="relative w-16 h-16 bg-gradient-to-br from-zinc-800 to-zinc-950 border border-white/10 rounded-2xl flex items-center justify-center cursor-crosshair shadow-2xl group"
               >
-                <Shield className="w-7 h-7 text-white" />
+                <div className="absolute inset-0 rounded-2xl bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <Shield className="w-8 h-8 text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]" />
               </motion.div>
             </div>
             <div>
               <div className="flex items-center gap-3">
                 <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_#22c55e]" />
-                <h1 className="text-4xl font-black tracking-widest uppercase text-white leading-none">SKY<span className="text-green-500">WATCH</span></h1>
+                <h1 className="text-4xl font-black tracking-widest uppercase text-white leading-none flex gap-2">
+                  <GlitchText text="SKY" />
+                  <span className="text-green-500"><GlitchText text="WATCH" className="text-green-500" /></span>
+                </h1>
               </div>
               <div className="flex items-center gap-4 mt-2">
                 <p className="text-[10px] text-zinc-500 font-mono tracking-[0.5em] uppercase leading-none">GLOBAL_CORE_v3.0.4</p>
@@ -110,10 +126,10 @@ export default function Dashboard() {
             </div>
 
             <div className="flex gap-4">
-              <motion.button whileHover={{ scale: 1.05 }} className="bg-white/5 border border-white/10 rounded-xl p-3 hover:bg-white/10 transition-all shadow-xl group">
+              <motion.button whileHover={{ scale: 1.05 }} className="w-12 h-12 bg-zinc-800/50 backdrop-blur-md border border-white/10 rounded-2xl flex items-center justify-center hover:bg-zinc-700 transition-all shadow-lg group">
                 <Lock className="h-5 w-5 text-zinc-400 group-hover:text-white" />
               </motion.button>
-              <motion.button whileHover={{ scale: 1.05 }} className="bg-white/5 border border-white/10 rounded-xl p-3 hover:bg-white/10 transition-all shadow-xl group">
+              <motion.button whileHover={{ scale: 1.05 }} className="w-12 h-12 bg-zinc-800/50 backdrop-blur-md border border-white/10 rounded-2xl flex items-center justify-center hover:bg-zinc-700 transition-all shadow-lg group">
                 <Terminal className="h-5 w-5 text-zinc-400 group-hover:text-white" />
               </motion.button>
             </div>
@@ -121,9 +137,22 @@ export default function Dashboard() {
         </motion.header>
 
         {/* SECTION 1: Summary Grid */}
-        <div id="section-summary" className="scroll-mt-32 space-y-4">
-          <div className="flex items-center gap-3 mb-2 px-2">
-            <span className="text-[10px] font-black text-white uppercase tracking-[0.4em]">01_QUICK_METRICS</span>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ duration: 0.6 }}
+          id="section-summary"
+          className="scroll-mt-32 space-y-4"
+        >
+          <div className="flex items-center gap-4 mb-6 px-2">
+            <div className="w-12 h-12 rounded-2xl bg-zinc-800/80 border border-white/10 flex items-center justify-center shadow-lg">
+              <Activity className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <span className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em] block mb-1">SECTION_01</span>
+              <span className="text-xl font-black text-white uppercase tracking-widest leading-none">QUICK_METRICS</span>
+            </div>
             <div className="flex-1 h-px bg-white/5" />
             <div className="flex items-center gap-2">
               <span className="text-[8px] font-mono text-green-500 uppercase">Status: Nominal</span>
@@ -156,12 +185,25 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* SECTION 2: Map & Analytics Row */}
-        <div id="section-map" className="scroll-mt-32 space-y-4">
-          <div className="flex items-center gap-3 mb-2 px-2">
-            <span className="text-[10px] font-black text-white uppercase tracking-[0.4em]">02_GEOSPATIAL_INTEL</span>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ duration: 0.6, delay: 0.1 }}
+          id="section-map"
+          className="scroll-mt-32 space-y-4"
+        >
+          <div className="flex items-center gap-4 mb-6 px-2">
+            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shadow-lg shadow-blue-500/5">
+              <MapPin className="h-6 w-6 text-blue-500" />
+            </div>
+            <div>
+              <span className="text-[10px] font-black text-blue-500/60 uppercase tracking-[0.2em] block mb-1">SECTION_02</span>
+              <span className="text-xl font-black text-white uppercase tracking-widest leading-none">GEOSPATIAL_INTEL</span>
+            </div>
             <div className="flex-1 h-px bg-white/5" />
             <div className="flex items-center gap-2">
               <span className="text-[8px] font-mono text-blue-400 uppercase">Uplink: Active</span>
@@ -170,9 +212,9 @@ export default function Dashboard() {
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             {/* Main Map Viewport */}
-            <div className="lg:col-span-8 bg-black/60 backdrop-blur-2xl border border-white/10 rounded-3xl overflow-hidden min-h-[600px] relative shadow-2xl group">
-              <div className="absolute inset-0 z-0">
-                <MapBackground />
+            <div className="lg:col-span-8 bg-black/60 backdrop-blur-2xl border border-white/10 rounded-3xl overflow-hidden min-h-[600px] relative shadow-2xl group transition-all duration-500 hover:shadow-[0_0_50px_rgba(0,0,0,0.5)] border-white/10 hover:border-white/20">
+              <div className="absolute inset-0 z-0 bg-black/50">
+                {/* MapBackground container removed */}
                 <div className="absolute inset-0 bg-green-500/[0.02] mix-blend-overlay pointer-events-none" />
               </div>
 
@@ -214,7 +256,7 @@ export default function Dashboard() {
             {/* Side Analytics Column */}
             <div className="lg:col-span-4 flex flex-col gap-6">
               {/* Real-time Activity Card */}
-              <div className="bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-xl flex flex-col flex-1">
+              <div className="bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-xl flex flex-col flex-1 hover:border-white/20 transition-all duration-300">
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2">
                     <TrendingUp className="h-4 w-4 text-green-500" />
@@ -253,7 +295,7 @@ export default function Dashboard() {
               </div>
 
               {/* Asset Distribution Pie */}
-              <div className="bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+              <div className="bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-xl relative overflow-hidden hover:border-white/20 transition-all duration-300">
                 <div className="flex justify-between items-center mb-6 relative z-10">
                   <h3 className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2">
                     <PieChartIcon className="h-4 w-4 text-blue-400" />
@@ -273,7 +315,7 @@ export default function Dashboard() {
                         dataKey="value"
                       >
                         {pieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
+                          <Cell key={`cell - ${index} `} fill={entry.color} />
                         ))}
                       </Pie>
                       <Tooltip />
@@ -299,12 +341,25 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* SECTION 3: Live Feeds & Tactical Summary */}
-        <div id="section-feeds" className="scroll-mt-32 space-y-4">
-          <div className="flex items-center gap-3 mb-2 px-2">
-            <span className="text-[10px] font-black text-white uppercase tracking-[0.4em]">03_CLUSTER_MONITOR</span>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+          id="section-feeds"
+          className="scroll-mt-32 space-y-4"
+        >
+          <div className="flex items-center gap-4 mb-6 px-2">
+            <div className="w-12 h-12 rounded-2xl bg-green-500/10 border border-green-500/20 flex items-center justify-center shadow-lg shadow-green-500/5">
+              <Radio className="h-6 w-6 text-green-500" />
+            </div>
+            <div>
+              <span className="text-[10px] font-black text-green-500/60 uppercase tracking-[0.2em] block mb-1">SECTION_03</span>
+              <span className="text-xl font-black text-white uppercase tracking-widest leading-none">CLUSTER_MONITOR</span>
+            </div>
             <div className="flex-1 h-px bg-white/5" />
             <div className="flex items-center gap-2">
               <span className="text-[8px] font-mono text-green-500 uppercase">Nodes: 14/14 Online</span>
@@ -313,7 +368,7 @@ export default function Dashboard() {
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             {/* Live Feed Hub - Updated to col-span-8 for alignment */}
-            <div className="lg:col-span-8 bg-black/40 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl relative overflow-hidden group">
+            <div className="lg:col-span-8 bg-black/40 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl relative overflow-hidden group hover:border-white/20 transition-all duration-300">
               <div className="absolute top-0 right-0 w-64 h-64 bg-green-500/[0.02] blur-[100px] pointer-events-none" />
 
               <div className="flex justify-between items-end mb-8 border-b border-white/5 pb-6">
@@ -351,7 +406,7 @@ export default function Dashboard() {
 
             {/* System Health/Hardware Summary - Updated to col-span-4 */}
             <div className="lg:col-span-4 space-y-6">
-              <div className="bg-black/80 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
+              <div className="bg-black/80 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 shadow-2xl relative overflow-hidden hover:border-white/20 transition-all duration-300">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-500/40 via-transparent to-transparent" />
                 <h3 className="text-[10px] font-black text-white mb-6 uppercase tracking-widest flex items-center gap-3">
                   <Thermometer className="h-4 w-4 text-orange-500" />
@@ -369,7 +424,7 @@ export default function Dashboard() {
                           className={cn("h-full transition-all duration-1000",
                             node.temp > 50 ? "bg-red-500 shadow-[0_0_10px_#ef4444]" : "bg-green-500 shadow-[0_0_10px_#22c55e]"
                           )}
-                          style={{ width: `${(node.temp / 60) * 100}%` }}
+                          style={{ width: `${(node.temp / 60) * 100}% ` }}
                         />
                       </div>
                     </div>
@@ -377,7 +432,7 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-xl relative group">
+              <div className="bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-xl relative group hover:border-white/20 transition-all duration-300">
                 <h3 className="text-[10px] font-black text-white mb-6 uppercase tracking-widest flex items-center gap-3">
                   <HardDrive className="h-4 w-4 text-blue-500" />
                   STORAGE_NODES
@@ -397,12 +452,25 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* SECTION 4: Threat Log Terminal */}
-        <div id="section-logs" className="scroll-mt-32 space-y-4">
-          <div className="flex items-center gap-3 mb-2 px-2">
-            <span className="text-[10px] font-black text-white uppercase tracking-[0.4em]">04_NETWORK_AUDIT</span>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ duration: 0.6, delay: 0.3 }}
+          id="section-logs"
+          className="scroll-mt-32 space-y-4"
+        >
+          <div className="flex items-center gap-4 mb-6 px-2">
+            <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shadow-lg shadow-red-500/5">
+              <Shield className="h-6 w-6 text-red-500" />
+            </div>
+            <div>
+              <span className="text-[10px] font-black text-red-500/60 uppercase tracking-[0.2em] block mb-1">SECTION_04</span>
+              <span className="text-xl font-black text-white uppercase tracking-widest leading-none">NETWORK_AUDIT</span>
+            </div>
             <div className="flex-1 h-px bg-white/5" />
             <div className="flex items-center gap-2">
               <span className="text-[8px] font-mono text-red-500 uppercase">Alerts: {activeAlerts} Active</span>
@@ -411,7 +479,7 @@ export default function Dashboard() {
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             {/* Long Scrolling Log Console */}
-            <div className="lg:col-span-8 bg-zinc-950 border border-white/5 rounded-3xl overflow-hidden shadow-2xl flex flex-col relative min-h-[500px]">
+            <div className="lg:col-span-8 bg-zinc-950 border border-white/5 rounded-3xl overflow-hidden shadow-2xl flex flex-col relative min-h-[500px] hover:border-white/20 transition-all duration-300">
               <div className="p-5 border-b border-white/5 bg-white/[0.02] flex items-center justify-between sticky top-0 bg-zinc-950/80 backdrop-blur-md z-20">
                 <div className="flex items-center gap-4">
                   <div className="flex gap-1.5">
@@ -455,7 +523,7 @@ export default function Dashboard() {
             </div>
 
             {/* High Priority Alerts Panel */}
-            <div className="lg:col-span-4 bg-black/60 backdrop-blur-xl border border-white/10 rounded-3xl flex flex-col overflow-hidden shadow-2xl">
+            <div className="lg:col-span-4 bg-black/60 backdrop-blur-xl border border-white/10 rounded-3xl flex flex-col overflow-hidden shadow-2xl hover:border-white/20 transition-all duration-300">
               <div className="p-6 border-b border-white/10 bg-red-500/[0.05] relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 to-transparent animate-pulse" />
                 <h3 className="text-[10px] font-black uppercase tracking-[0.3em] flex items-center gap-4 text-red-500 relative z-10">
@@ -498,7 +566,7 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {/* Floating Section Navigator */}
@@ -506,7 +574,7 @@ export default function Dashboard() {
         {['summary', 'map', 'feeds', 'logs'].map((section, i) => (
           <motion.a
             key={section}
-            href={`#section-${section}`}
+            href={`#section - ${section} `}
             whileHover={{ scale: 1.2, x: -4 }}
             className="group relative"
           >

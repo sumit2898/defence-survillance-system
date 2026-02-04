@@ -4,10 +4,22 @@ export function WeatherLayer({ active }: { active: boolean }) {
     if (!active) return null;
 
     return (
-        <div className="absolute inset-0 pointer-events-none z-20 overflow-hidden">
-            {/* Rain Effect */}
-            <div className="absolute inset-0 bg-[url('https://raw.githubusercontent.com/yoshiharuyamashita/css-rain/master/rain.png')] animate-[rain_0.5s_linear_infinite]"
-                style={{ opacity: 0.1 }} />
+        <div className="absolute inset-0 pointer-events-none z-20 overflow-hidden select-none">
+            {/* CSS-Only Rain Effect */}
+            <div className="absolute inset-0 mix-blend-screen opacity-30"
+                style={{
+                    backgroundImage: `linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0.5))`,
+                    backgroundSize: '2px 30px',
+                    animation: 'rain 0.3s linear infinite'
+                }}
+            />
+
+            <style>{`
+                @keyframes rain {
+                    0% { background-position: 0% 0%; }
+                    100% { background-position: 20px 100%; }
+                }
+            `}</style>
 
             {/* Cloud/Fog Overlay */}
             <div className="absolute inset-0 bg-white/5 mix-blend-overlay animate-pulse" />
@@ -146,5 +158,38 @@ export function IndianBorderLayer({ active }: { active: boolean }) {
                 ))}
             </g>
         </svg>
+    );
+}
+
+export function SatelliteLayer({ active }: { active: boolean }) {
+    if (!active) return null;
+
+    return (
+        <div className="absolute inset-0 pointer-events-none z-20 overflow-hidden select-none opacity-50">
+            {/* Satellite 1 */}
+            <motion.div
+                initial={{ x: -50, y: 100 }}
+                animate={{ x: "120vw", y: 300 }}
+                transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                className="absolute flex items-center gap-2"
+            >
+                <div className="w-2 h-2 bg-blue-400 rounded-full shadow-[0_0_10px_#60a5fa]" />
+                <span className="text-[8px] font-mono text-blue-400 bg-black/50 px-1">SAT_LEO_01 [LINK_ACTIVE]</span>
+            </motion.div>
+
+            {/* Satellite 2 */}
+            <motion.div
+                initial={{ x: "120vw", y: 400 }}
+                animate={{ x: -50, y: 150 }}
+                transition={{ duration: 25, repeat: Infinity, ease: "linear", delay: 2 }}
+                className="absolute flex items-center gap-2"
+            >
+                <div className="w-2 h-2 bg-green-400 rounded-full shadow-[0_0_10px_#4ade80]" />
+                <span className="text-[8px] font-mono text-green-400 bg-black/50 px-1">SAT_GEO_09 [STABLE]</span>
+            </motion.div>
+
+            {/* Grid Overlay */}
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(59,130,246,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(59,130,246,0.1)_1px,transparent_1px)] bg-[size:100px_100px]" />
+        </div>
     );
 }
