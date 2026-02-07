@@ -1,22 +1,19 @@
-"""
-AI Service - Main Entry Point
-FastAPI backend for AI-based threat detection
-Provides real-time object detection via WebSocket and REST API
-"""
-
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import asyncio
 import json
+import cv2
 from datetime import datetime
 from typing import List, Dict
+import time
 import uvicorn
 from fastapi.responses import StreamingResponse
 import io
-import cv2
 
 from mock_detector import MockDetector, ThreatLevel
+from mock_fusion import MockFusionEngine
+from prediction_engine import ThreatPredictor
 
 # Try to import Vision Engine
 try:
@@ -47,13 +44,29 @@ app.add_middleware(
 # CONFIGURATION
 # ==============================================================================
 # Use 0 for webcam, or HTTP URL for IP Camera
-VIDEO_SOURCE = "http://192.168.1.8:8080/video"
-# VIDEO_SOURCE = 0
+# VIDEO_SOURCE = "http://172.16.4.124:8080/video"
+VIDEO_SOURCE = 0
 
 # Global instances
 detector = MockDetector(frame_width=1280, frame_height=720)
+fusion_engine = MockFusionEngine()
+predictor = ThreatPredictor()
 vision_engine = None
 using_real_vision = False
+
+print(f"🔧 CONFIG: VISION_AVAILABLE={VISION_AVAILABLE}", flush=True)
+print(f"🔧 CONFIG: VIDEO_SOURCE={VIDEO_SOURCE}", flush=True)
+
+if VISION_AVAILABLE:
+    try:
+        print("🚀 Initializing Vision Engine...", flush=True)
+        vision_engine = VisionEngine(source=VIDEO_SOURCE)
+        vision_engine.start()
+        using_real_vision = True
+        print("✅ Vision Engine Started", flush=True)
+    except Exception as e:
+         print(f"❌ Failed to start Vision Engine: {e}", flush=True)
+         using_real_vision = False
 
 class ConnectionManager:
     def __init__(self):
@@ -281,7 +294,9 @@ async def websocket_stream(websocket: WebSocket):
                 "frame_id": current_frame_id,
                 "detections": detections,
                 "mode": "real" if using_real_vision else "mock",
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
+                "fusion": fusion_engine.update(),
+                "predictions": predictor.predict_risks() if frame_count % 300 == 0 else None # Update predictions every ~10s
             }
             
             await websocket.send_json(frame_data)

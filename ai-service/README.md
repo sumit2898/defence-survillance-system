@@ -26,6 +26,18 @@ cd ai-service
 pip install -r requirements.txt
 ```
 
+### 3. Facial Recognition
+The system checks `ai-service/assets/known_faces` for images of authorized personnel.
+1. Add `.jpg` photos of people to `ai-service/assets/known_faces`.
+2. Name the files `first_last.jpg` (e.g., `john_doe.jpg`).
+3. Restart the AI service. The system will load them on startup and label detections with the person's name.
+
+### 4. Vehicle License Plate Recognition (ALPR)
+The system automatically detects text on vehicles (Car, Truck, Bus, Motorcycle).
+- **Trigger**: Detections with high confidence (>60%).
+- **Alert**: If a plate contains "STOLEN" or "BAD", it triggers a Critical Alert.
+- **Engine**: Uses `EasyOCR` (runs on CPU by default for compatibility).
+
 ## 🚀 Running the Service
 
 ### Development Mode

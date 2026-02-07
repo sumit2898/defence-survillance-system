@@ -30,6 +30,8 @@ import { AreaChart, Area, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, R
 import { ThreatConsole } from '@/components/ThreatConsole';
 import { AIDetectionOverlay } from '@/components/AIDetectionOverlay';
 import { ThreatMap } from '@/components/ThreatMap';
+import { SensorFusion } from '@/components/SensorFusion';
+import { EdgeComputing } from '@/components/EdgeComputing';
 import { cn } from '@/lib/utils';
 
 interface AIStats {
@@ -51,6 +53,7 @@ interface Detection {
         width: number;
         height: number;
     };
+    bbox_normalized?: number[];
     threat_level: 'normal' | 'suspicious' | 'critical';
     timestamp: string;
 }
@@ -78,6 +81,8 @@ export default function AutonomousShield() {
     const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
     const [detections, setDetections] = useState<Detection[]>([]);
     const [alerts, setAlerts] = useState<Alert[]>([]);
+    const [fusionData, setFusionData] = useState<any>(null);
+    const [predictionData, setPredictionData] = useState<any>(null);
     const [stats, setStats] = useState<AIStats>({
         totalDetections: 0,
         criticalAlerts: 0,
@@ -107,7 +112,8 @@ export default function AutonomousShield() {
     useEffect(() => {
         // Connect to AI service WebSocket
         const connectWebSocket = () => {
-            const ws = new WebSocket('ws://localhost:8000/api/ai/stream');
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const ws = new WebSocket(`${protocol}//${window.location.hostname}:8000/api/ai/stream`);
 
             ws.onopen = () => {
                 console.log('🛡️ Connected to Autonomous Shield AI');
@@ -119,19 +125,28 @@ export default function AutonomousShield() {
 
                 if (data.type === 'frame_analysis') {
                     setDetections(data.detections || []);
+                    if (data.fusion) setFusionData(data.fusion);
+                    if (data.predictions) setPredictionData(data.predictions);
 
-                    // Update stats
-                    const critical = data.detections.filter((d: Detection) => d.threat_level === 'critical').length;
-                    const suspicious = data.detections.filter((d: Detection) => d.threat_level === 'suspicious').length;
-                    const normal = data.detections.filter((d: Detection) => d.threat_level === 'normal').length;
+                    // Update stats logic to track unique entities if track_id is present
+                    // otherwise fall back to simple count if no tracking (though we enabled tracking)
+                    const currentIds = new Set(data.detections.map((d: any) => d.track_id || d.id));
 
-                    setStats(prev => ({
-                        ...prev,
-                        totalDetections: prev.totalDetections + data.detections.length,
-                        criticalAlerts: prev.criticalAlerts + critical,
-                        suspiciousEvents: prev.suspiciousEvents + suspicious,
-                        normalActivity: prev.normalActivity + normal
-                    }));
+                    setStats(prev => {
+                        // We need a way to persist unique IDs across renders without causing infinite loops or massive state
+                        // distinct from the display stats. 
+                        // Ideally, we'd use a ref for the Set of all seen IDs.
+                        return {
+                            ...prev,
+                            // For now, let's change "Total Detections" to "Detections in View" which is more useful for live monitoring
+                            // Or if we want "Total Unique", we need a ref.
+                            // Let's switch to "Active Targets" for clarity as "Total Detections" is vague.
+                            totalDetections: data.detections.length,
+                            criticalAlerts: data.detections.filter((d: Detection) => d.threat_level === 'critical').length,
+                            suspiciousEvents: data.detections.filter((d: Detection) => d.threat_level === 'suspicious').length,
+                            normalActivity: data.detections.filter((d: Detection) => d.threat_level === 'normal').length
+                        };
+                    });
                 }
 
                 if (data.type === 'critical_alert') {
@@ -203,7 +218,7 @@ export default function AutonomousShield() {
                                     <p className="text-[10px] text-zinc-500 font-mono tracking-[0.3em]">ACTIVE_INTELLIGENCE_CORE_v4.2</p>
                                     <div className="h-3 w-[1px] bg-white/10" />
                                     <p className="text-[10px] text-green-500 font-mono tracking-widest uppercase">
-                                        {isConnected ? 'SECURE_LINK_BSTABLISHED' : 'LINK_PENDING...'}
+                                        {isConnected ? 'SECURE_LINK_ESTABLISHED' : 'LINK_PENDING...'}
                                     </p>
                                 </div>
                             </div>
@@ -350,7 +365,7 @@ export default function AutonomousShield() {
 
                                 <div className="grid grid-cols-1 gap-3">
                                     <StatCard
-                                        label="Total Detections"
+                                        label="Targets In View"
                                         value={stats.totalDetections.toString()}
                                         icon={Eye}
                                         trend="neutral"
@@ -442,6 +457,16 @@ export default function AutonomousShield() {
                                         </AreaChart>
                                     </ResponsiveContainer>
                                 </div>
+
+                            </motion.div>
+
+                            {/* Edge Computing Node Status */}
+                            <motion.div
+                                initial={{ x: -20, opacity: 0 }}
+                                animate={{ x: 0, opacity: 1 }}
+                                transition={{ delay: 0.4 }}
+                            >
+                                <EdgeComputing />
                             </motion.div>
 
 
@@ -486,71 +511,17 @@ export default function AutonomousShield() {
 
                             {/* BOTTOM: Geospatial Intel (Map) - 40% Height */}
                             <div className="flex-[2] relative bg-black/40 border border-white/10 rounded-2xl overflow-hidden backdrop-blur-md">
-                                <ThreatMap alerts={alerts} />
+                                <ThreatMap alerts={alerts} predictions={predictionData} />
                             </div>
 
-                            {/* MODULE SHOWCASE: Command Capabilities */}
-                            <div className="h-48 grid grid-cols-4 gap-4">
-                                {/* Neural Analytics Card */}
-                                <div className="group relative bg-black/40 border border-white/10 rounded-xl p-4 overflow-hidden hover:border-purple-500/50 transition-all cursor-pointer">
-                                    <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    <Brain className="w-8 h-8 text-purple-500 mb-3" />
-                                    <h3 className="text-sm font-black text-white uppercase tracking-wider mb-1">
-                                        Neural Analytics
-                                    </h3>
-                                    <p className="text-[10px] text-zinc-400 leading-tight mb-3">
-                                        Deep dive into AI confidence scoring, forensic event logs, and historical pattern recognition.
-                                    </p>
-                                    <div className="text-[9px] font-mono text-purple-400 flex items-center gap-1">
-                                        ACCESS_MODULE <span className="text-xs">→</span>
-                                    </div>
+                            {/* SENSOR FUSION PANEL */}
+                            <div className="h-48 relative">
+                                <div className="absolute -top-3 left-0 bg-black/80 px-2 py-0.5 text-[9px] font-mono text-cyan-500 border border-cyan-500/30 rounded z-10">
+                                    MULTI-SENSOR FUSION
                                 </div>
-
-                                {/* Tactical 3D Card */}
-                                <div className="group relative bg-black/40 border border-white/10 rounded-xl p-4 overflow-hidden hover:border-cyan-500/50 transition-all cursor-pointer">
-                                    <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    <Target className="w-8 h-8 text-cyan-500 mb-3" />
-                                    <h3 className="text-sm font-black text-white uppercase tracking-wider mb-1">
-                                        Tactical 3D
-                                    </h3>
-                                    <p className="text-[10px] text-zinc-400 leading-tight mb-3">
-                                        Real-time asset tracking in 3D space. Monitor drone telemetry, battery, and signal coverage.
-                                    </p>
-                                    <div className="text-[9px] font-mono text-cyan-400 flex items-center gap-1">
-                                        ACCESS_MODULE <span className="text-xs">→</span>
-                                    </div>
-                                </div>
-
-                                {/* Devices & Assets Card */}
-                                <div className="group relative bg-black/40 border border-white/10 rounded-xl p-4 overflow-hidden hover:border-green-500/50 transition-all cursor-pointer">
-                                    <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    <Cpu className="w-8 h-8 text-green-500 mb-3" />
-                                    <h3 className="text-sm font-black text-white uppercase tracking-wider mb-1">
-                                        Asset Control
-                                    </h3>
-                                    <p className="text-[10px] text-zinc-400 leading-tight mb-3">
-                                        Manage hardware nodes, reboot cameras, check server load, and update firmware.
-                                    </p>
-                                    <div className="text-[9px] font-mono text-green-400 flex items-center gap-1">
-                                        ACCESS_MODULE <span className="text-xs">→</span>
-                                    </div>
-                                </div>
-
-                                {/* System Logs Card */}
-                                <div className="group relative bg-black/40 border border-white/10 rounded-xl p-4 overflow-hidden hover:border-amber-500/50 transition-all cursor-pointer">
-                                    <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    <Database className="w-8 h-8 text-amber-500 mb-3" />
-                                    <h3 className="text-sm font-black text-white uppercase tracking-wider mb-1">
-                                        System Logs
-                                    </h3>
-                                    <p className="text-[10px] text-zinc-400 leading-tight mb-3">
-                                        Audit trail of all security events, user actions, and system health warnings.
-                                    </p>
-                                    <div className="text-[9px] font-mono text-amber-400 flex items-center gap-1">
-                                        ACCESS_MODULE <span className="text-xs">→</span>
-                                    </div>
-                                </div>
+                                <SensorFusion data={fusionData} />
                             </div>
+
 
                         </div>
                         <div className="col-span-3 flex flex-col gap-4">
@@ -605,10 +576,10 @@ export default function AutonomousShield() {
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </div>
-            </div>
-        </Layout>
+                    </div >
+                </div >
+            </div >
+        </Layout >
     );
 }
 

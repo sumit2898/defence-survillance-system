@@ -6,3 +6,8 @@ vite.config.ts.*
 *.tar.gz
 test-results/
 .env
+__pycache__
+*.pyc
+.vscode
+.idea
+*.log

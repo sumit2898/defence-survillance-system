@@ -21,6 +21,7 @@ class ObjectClass(Enum):
     HUMAN = "human"
     VEHICLE = "vehicle"
     WEAPON = "weapon"
+    DRONE = "drone"
     UNKNOWN = "unknown"
 
 class MockDetector:
@@ -36,9 +37,10 @@ class MockDetector:
         
         # Realistic detection probabilities
         self.class_distribution = {
-            ObjectClass.HUMAN: 0.70,      # 70% humans
+            ObjectClass.HUMAN: 0.60,      # 60% humans
             ObjectClass.VEHICLE: 0.15,    # 15% vehicles
             ObjectClass.WEAPON: 0.05,     # 5% weapons (CRITICAL)
+            ObjectClass.DRONE: 0.10,      # 10% drones (AERIAL THREAT)
             ObjectClass.UNKNOWN: 0.10     # 10% unknown
         }
         
@@ -65,6 +67,9 @@ class MockDetector:
         elif obj_class == ObjectClass.VEHICLE:
             # Vehicles: 70-90% confidence
             return round(random.uniform(0.70, 0.90), 2)
+        elif obj_class == ObjectClass.DRONE:
+            # Drones: 60-85% confidence (harder to detect)
+            return round(random.uniform(0.60, 0.85), 2)
         else:
             # Unknown: 60-75% confidence
             return round(random.uniform(0.60, 0.75), 2)
@@ -85,6 +90,8 @@ class MockDetector:
         """Classify threat level based on object and confidence"""
         if obj_class == ObjectClass.WEAPON and confidence > 0.85:
             return ThreatLevel.CRITICAL
+        elif obj_class == ObjectClass.DRONE:
+            return ThreatLevel.SUSPICIOUS # Drones are always suspicious
         elif obj_class == ObjectClass.WEAPON or (obj_class == ObjectClass.HUMAN and confidence > 0.90):
             return ThreatLevel.SUSPICIOUS
         else:
