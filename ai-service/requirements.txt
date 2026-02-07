@@ -7,20 +7,16 @@ uvicorn[standard]>=0.24.0
 websockets>=12.0
 pydantic>=2.0.0
 python-multipart>=0.0.6
+sqlalchemy>=2.0.0
+aiosqlite>=0.19.0
 
-# Optional: Real YOLOv8 Support
-# Uncomment these to use real camera detection
-# ultralytics>=8.0.0
-# opencv-python>=4.8.0
-# torch>=2.0.0
-# numpy>=1.24.0
+# AI Model Dependencies (YOLO26 + Advanced Models)
+ultralytics>=8.3.0          # YOLO26 support
+torch>=2.1.0                # PyTorch for deep learning
+torchvision>=0.16.0         # Vision utilities
+opencv-python>=4.9.0        # Computer vision
+numpy>=1.26.0               # Numerical computing
+pillow>=10.2.0              # Image processing
 
-# Note: YOLOv8 dependencies are large (~500MB)
-# The system works fine with mock detector if not installed
- (for future WebRTC integration)
-# opencv-python>=4.8.0
-# numpy>=1.24.0
-# pillow>=10.0.0
-
-# Utilities
-pydantic>=2.0.0
+# Note: AI dependencies are large (~2GB total)
+# The system will use simulation mode if not installed

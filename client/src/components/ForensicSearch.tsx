@@ -55,12 +55,12 @@ export function ForensicSearch({ onSearch }: ForensicSearchProps) {
     };
 
     return (
-        <Card className="bg-black/40 border-white/10 backdrop-blur-md overflow-hidden">
-            <div className="p-4 space-y-4">
+        <Card className="bg-zinc-900/60 border-white/15 backdrop-blur-md overflow-hidden shadow-lg shadow-black/20">
+            <div className="p-5 space-y-4">
                 {/* Header */}
                 <div className="flex items-center gap-2">
                     <Search className="w-4 h-4 text-cyan-500" />
-                    <h3 className="text-xs font-black tracking-wider uppercase text-white">
+                    <h3 className="text-sm font-display font-bold tracking-wider uppercase text-white">
                         FORENSIC SEARCH
                     </h3>
                 </div>
@@ -72,7 +72,7 @@ export function ForensicSearch({ onSearch }: ForensicSearchProps) {
                         onChange={(e) => setSearchText(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                         placeholder="Search events, objects, or describe..."
-                        className="bg-zinc-900/50 border-white/10 text-white placeholder:text-zinc-600 font-mono text-sm pr-10"
+                        className="bg-zinc-900/70 border-white/15 text-white placeholder:text-zinc-500 font-mono text-sm pr-10 focus:border-cyan-500/50 focus:ring-cyan-500/20"
                     />
                     {searchText && (
                         <button
@@ -86,7 +86,7 @@ export function ForensicSearch({ onSearch }: ForensicSearchProps) {
 
                 {/* Quick Filters */}
                 <div>
-                    <div className="text-[10px] text-zinc-500 font-mono mb-2">QUICK_FILTERS</div>
+                    <div className="text-xs text-zinc-400 font-tech mb-2 font-semibold tracking-wide">QUICK_FILTERS</div>
                     <div className="flex flex-wrap gap-2">
                         {quickFilters.map((filter) => {
                             const isActive = activeFilters.includes(filter.id);
@@ -96,10 +96,10 @@ export function ForensicSearch({ onSearch }: ForensicSearchProps) {
                                     whileTap={{ scale: 0.95 }}
                                     onClick={() => toggleFilter(filter.id)}
                                     className={cn(
-                                        'px-3 py-1.5 rounded border text-xs font-mono transition-all',
+                                        'px-3 py-1.5 rounded border text-xs font-mono transition-all font-semibold',
                                         isActive
-                                            ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
-                                            : 'bg-zinc-900/50 text-zinc-400 border-white/10 hover:border-white/20'
+                                            ? 'bg-cyan-500/25 text-cyan-300 border-cyan-500/40 shadow-[0_0_10px_rgba(6,182,212,0.2)]'
+                                            : 'bg-zinc-900/50 text-zinc-400 border-white/10 hover:border-white/20 hover:bg-zinc-900/70'
                                     )}
                                 >
                                     <span className="mr-1">{filter.icon}</span>
@@ -118,7 +118,7 @@ export function ForensicSearch({ onSearch }: ForensicSearchProps) {
                         exit={{ height: 0, opacity: 0 }}
                         className="flex items-center gap-2 flex-wrap"
                     >
-                        <span className="text-[10px] text-zinc-500 font-mono">ACTIVE:</span>
+                        <span className="text-xs text-zinc-400 font-tech font-semibold">ACTIVE:</span>
                         {activeFilters.map((filterId) => {
                             const filter = quickFilters.find((f) => f.id === filterId);
                             return (
@@ -141,7 +141,7 @@ export function ForensicSearch({ onSearch }: ForensicSearchProps) {
 
                 {/* Examples */}
                 <div>
-                    <div className="text-[10px] text-zinc-500 font-mono mb-2">EXAMPLES</div>
+                    <div className="text-xs text-zinc-400 font-tech mb-2 font-semibold tracking-wide">EXAMPLES</div>
                     <div className="space-y-1">
                         {examples.map((example, index) => (
                             <motion.button
@@ -150,7 +150,7 @@ export function ForensicSearch({ onSearch }: ForensicSearchProps) {
                                 animate={{ opacity: 1, x: 0 }}
                                 transition={{ delay: index * 0.1 }}
                                 onClick={() => setSearchText(example)}
-                                className="w-full text-left px-3 py-2 text-xs text-zinc-400 hover:text-white bg-zinc-900/30 hover:bg-zinc-900/50 rounded border border-transparent hover:border-white/10 transition-all font-mono"
+                                className="w-full text-left px-3 py-2 text-xs text-zinc-300 hover:text-white bg-zinc-900/40 hover:bg-zinc-900/60 rounded border border-transparent hover:border-white/15 transition-all font-mono"
                             >
                                 → {example}
                             </motion.button>
@@ -161,7 +161,7 @@ export function ForensicSearch({ onSearch }: ForensicSearchProps) {
                 {/* Search Button */}
                 <Button
                     onClick={handleSearch}
-                    className="w-full bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 border border-cyan-500/30 font-mono text-xs"
+                    className="w-full bg-cyan-500/25 hover:bg-cyan-500/35 text-cyan-300 border border-cyan-500/40 font-mono text-xs font-bold shadow-[0_0_15px_rgba(6,182,212,0.2)] hover:shadow-[0_0_20px_rgba(6,182,212,0.3)] transition-all"
                 >
                     <Search className="w-3 h-3 mr-2" />
                     SEARCH DATABASE
@@ -169,7 +169,7 @@ export function ForensicSearch({ onSearch }: ForensicSearchProps) {
 
                 {/* Search History */}
                 <div className="pt-4 border-t border-white/5">
-                    <div className="text-[10px] text-zinc-500 font-mono mb-2">RECENT_SEARCHES</div>
+                    <div className="text-xs text-zinc-400 font-tech mb-2 font-semibold tracking-wide">RECENT_SEARCHES</div>
                     <div className="space-y-1 text-[10px] text-zinc-600 font-mono">
                         <div className="flex items-center gap-2">
                             <span className="text-zinc-700">•</span>

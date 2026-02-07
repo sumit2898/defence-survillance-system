@@ -30,6 +30,7 @@ import { AreaChart, Area, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, R
 import { ThreatConsole } from '@/components/ThreatConsole';
 import { AIDetectionOverlay } from '@/components/AIDetectionOverlay';
 import { ThreatMap } from '@/components/ThreatMap';
+import { ModelSelector } from '@/components/ModelSelector';
 import { cn } from '@/lib/utils';
 
 interface AIStats {
@@ -230,13 +231,21 @@ export default function AutonomousShield() {
                     </div>
                 </div>
 
+                {/* Model Selector Section */}
+                <div className="px-6 py-3 border-b border-white/10 bg-black/60 backdrop-blur-md relative z-10">
+                    <ModelSelector />
+                </div>
+
                 {/* Main Content - Two Sections */}
                 <div className="flex-1 flex flex-col relative z-10 text-white">
 
                     {/* Mission Control Matrix */}
                     <div className="px-6 pt-6 pb-2 grid grid-cols-5 gap-4">
                         {/* 1. Tactical */}
-                        <div className="bg-black/40 border border-white/10 rounded-lg p-3 backdrop-blur-md flex flex-col justify-between h-24 relative overflow-hidden group hover:border-cyan-500/30 transition-colors">
+                        <motion.div
+                            whileHover={{ y: -2, scale: 1.02 }}
+                            transition={{ duration: 0.2 }}
+                            className="bg-black/40 border border-white/10 rounded-lg p-3 backdrop-blur-md flex flex-col justify-between h-24 relative overflow-hidden group hover:border-cyan-500/30 hover:shadow-glow-blue transition-all">
                             <div className="flex justify-between items-start z-10">
                                 <div>
                                     <div className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-1">TACTICAL</div>
@@ -252,10 +261,13 @@ export default function AutonomousShield() {
                                 </ResponsiveContainer>
                             </div>
                             <div className="absolute inset-x-0 bottom-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent group-hover:via-cyan-500/60 transition-all" />
-                        </div>
+                        </motion.div>
 
                         {/* 2. Alerts */}
-                        <div className="bg-black/40 border border-white/10 rounded-lg p-3 backdrop-blur-md flex flex-col justify-between h-24 relative overflow-hidden group hover:border-red-500/30 transition-colors">
+                        <motion.div
+                            whileHover={{ y: -2, scale: 1.02 }}
+                            transition={{ duration: 0.2 }}
+                            className="bg-black/40 border border-white/10 rounded-lg p-3 backdrop-blur-md flex flex-col justify-between h-24 relative overflow-hidden group hover:border-red-500/30 hover:shadow-glow-red transition-all">
                             <div className="flex justify-between items-start z-10">
                                 <div>
                                     <div className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-1">THREATS</div>
@@ -270,10 +282,13 @@ export default function AutonomousShield() {
                                     </AreaChart>
                                 </ResponsiveContainer>
                             </div>
-                        </div>
+                        </motion.div>
 
                         {/* 3. Devices */}
-                        <div className="bg-black/40 border border-white/10 rounded-lg p-3 backdrop-blur-md flex flex-col justify-between h-24 relative overflow-hidden group hover:border-green-500/30 transition-colors">
+                        <motion.div
+                            whileHover={{ y: -2, scale: 1.02 }}
+                            transition={{ duration: 0.2 }}
+                            className="bg-black/40 border border-white/10 rounded-lg p-3 backdrop-blur-md flex flex-col justify-between h-24 relative overflow-hidden group hover:border-green-500/30 hover:shadow-glow-green transition-all">
                             <div className="flex justify-between items-start z-10">
                                 <div>
                                     <div className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-1">ASSETS</div>
@@ -291,10 +306,13 @@ export default function AutonomousShield() {
                                     </PieChart>
                                 </ResponsiveContainer>
                             </div>
-                        </div>
+                        </motion.div>
 
                         {/* 4. Logs */}
-                        <div className="bg-black/40 border border-white/10 rounded-lg p-3 backdrop-blur-md flex flex-col justify-between h-24 relative overflow-hidden group hover:border-blue-500/30 transition-colors">
+                        <motion.div
+                            whileHover={{ y: -2, scale: 1.02 }}
+                            transition={{ duration: 0.2 }}
+                            className="bg-black/40 border border-white/10 rounded-lg p-3 backdrop-blur-md flex flex-col justify-between h-24 relative overflow-hidden group hover:border-blue-500/30 hover:shadow-glow-blue transition-all">
                             <div className="flex justify-between items-start z-10">
                                 <div>
                                     <div className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-1">EVENTS</div>
@@ -309,10 +327,13 @@ export default function AutonomousShield() {
                                     </LineChart>
                                 </ResponsiveContainer>
                             </div>
-                        </div>
+                        </motion.div>
 
                         {/* 5. Neural */}
-                        <div className="bg-black/40 border border-white/10 rounded-lg p-3 backdrop-blur-md flex flex-col justify-between h-24 relative overflow-hidden group hover:border-purple-500/30 transition-colors">
+                        <motion.div
+                            whileHover={{ y: -2, scale: 1.02 }}
+                            transition={{ duration: 0.2 }}
+                            className="bg-black/40 border border-white/10 rounded-lg p-3 backdrop-blur-md flex flex-col justify-between h-24 relative overflow-hidden group hover:border-purple-500/30 hover:shadow-glow-blue transition-all">
                             <div className="flex justify-between items-start z-10">
                                 <div>
                                     <div className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-1">NEURAL</div>
@@ -327,7 +348,7 @@ export default function AutonomousShield() {
                                     </LineChart>
                                 </ResponsiveContainer>
                             </div>
-                        </div>
+                        </motion.div>
                     </div>
                     {/* Top Section - Dashboard Grid */}
                     <div className="flex-1 grid grid-cols-12 gap-4 p-4">

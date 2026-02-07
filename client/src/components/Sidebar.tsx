@@ -25,7 +25,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 
 const navItems = [
-  { href: "/", label: "🛡️ Autonomous Shield", icon: Shield },
+  { href: "/system", label: "🛡️ Autonomous Shield", icon: Shield },
   { href: "/analytics", label: "Neural Analytics", icon: Brain },
   { href: "/tactical", label: "Tactical 3D", icon: Layers3 },
   { href: "/map", label: "Map View", icon: Map },
@@ -70,7 +70,7 @@ export function Sidebar() {
                 <div className="absolute inset-0 bg-red-500/20 blur-sm animate-pulse rounded" />
                 <div className="relative w-10 h-10 bg-zinc-900 border border-white/10 rounded flex items-center justify-center overflow-hidden">
                   <div className="absolute inset-0 bg-gradient-to-t from-red-500/10 to-transparent" />
-                  <ShieldAlert className="w-5 h-5 text-red-500" />
+                  <img src="/logo.png" alt="Autonomous Shield Logo" className="w-8 h-8 object-contain" />
                 </div>
               </div>
               <div>
@@ -92,23 +92,38 @@ export function Sidebar() {
                   <Link key={item.href} href={item.href}>
                     <div
                       className={cn(
-                        "flex items-center px-4 py-3 rounded border transition-all duration-200 cursor-pointer group relative overflow-hidden",
+                        "flex items-center px-4 py-3 rounded border transition-all duration-300 cursor-pointer group relative overflow-hidden",
                         isActive
                           ? "bg-white/10 border-white/20 text-white shadow-[inset_0_0_15px_rgba(255,255,255,0.05)]"
-                          : "text-zinc-500 border-transparent hover:bg-white/[0.03] hover:text-white hover:translate-x-1"
+                          : "text-zinc-500 border-transparent hover:bg-white/[0.05] hover:text-white hover:translate-x-1 hover:border-white/10"
                       )}
                     >
+                      {/* Active indicator */}
                       {isActive && (
                         <motion.div
-                          layoutId="active-indicator"
-                          className="absolute left-0 w-1 h-1/2 bg-red-500 rounded-r shadow-[0_0_10px_#ef4444]"
+                          layoutId="activeNav"
+                          className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-green-500 to-emerald-500 shadow-glow-green"
+                          transition={{ type: "spring", stiffness: 300, damping: 30 }}
                         />
                       )}
-                      <Icon className={cn("mr-4 h-4.5 w-4.5 transition-colors", isActive ? "text-red-500" : "group-hover:text-red-400")} />
-                      <span className="text-xs font-bold tracking-wider uppercase font-mono">{item.label}</span>
 
-                      {/* Hover Scanline */}
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:animate-[shimmer_2s_infinite] pointer-events-none" />
+                      {/* Hover glow effect */}
+                      <div className="absolute inset-0 bg-gradient-to-r from-green-500/0 via-green-500/5 to-green-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+                      <Icon className={cn(
+                        "w-4 h-4 mr-3 transition-all duration-300 relative z-10",
+                        isActive ? "text-green-500" : "text-zinc-600 group-hover:text-green-500 group-hover:scale-110"
+                      )} />
+                      <span className="text-xs font-medium tracking-wide uppercase relative z-10">{item.label}</span>
+
+                      {/* Arrow indicator on hover */}
+                      <motion.div
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: isActive ? 0 : 0, x: isActive ? -10 : -10 }}
+                        className="ml-auto opacity-0 group-hover:opacity-100 transition-all duration-300 relative z-10"
+                      >
+                        <div className="w-1.5 h-1.5 border-r border-t border-green-500 rotate-45" />
+                      </motion.div>
                     </div>
                   </Link>
                 );

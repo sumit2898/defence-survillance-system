@@ -17,6 +17,7 @@ import io
 import cv2
 
 from mock_detector import MockDetector, ThreatLevel
+from model_manager import get_model_manager, ModelType
 
 # Try to import Vision Engine
 try:
@@ -54,6 +55,7 @@ VIDEO_SOURCE = "http://192.168.1.8:8080/video"
 detector = MockDetector(frame_width=1280, frame_height=720)
 vision_engine = None
 using_real_vision = False
+model_manager = None  # Will be initialized on startup
 
 class ConnectionManager:
     def __init__(self):
@@ -127,7 +129,20 @@ async def startup():
     await init_db()
     print("💾 Database Initialized")
 
-    global vision_engine, using_real_vision
+    global vision_engine, using_real_vision, model_manager
+    
+    # Initialize Model Manager
+    print("\n🤖 Initializing AI Model Manager...")
+    model_manager = get_model_manager()
+    
+    # Try to load YOLO26 first, fallback to MOCK
+    if model_manager.load_model(ModelType.YOLO26):
+        model_manager.set_active_model(ModelType.YOLO26)
+        print("✅ YOLO26 Model Loaded and Active")
+    else:
+        print("⚠️  YOLO26 unavailable, using MOCK detector")
+        model_manager.load_model(ModelType.MOCK)
+        model_manager.set_active_model(ModelType.MOCK)
     
     if VIDEO_SOURCE is not None and VISION_AVAILABLE:
         print(f"\n👁️  Initializing Vision Engine: {VIDEO_SOURCE}")
@@ -140,10 +155,11 @@ async def startup():
             print(f"⚠️  Vision Engine Failed: {e}")
             vision_engine = None
     else:
-        print("\n⚠️  Using MOCK DETECTOR (Vision Engine unavailable)")
+        print("\n⚠️  Using simulated video stream")
     
-    mode = "REAL YOLOv8" if using_real_vision else "MOCK DETECTOR"
-    print(f"\n🛡️  AUTONOMOUS SHIELD - {mode} MODE")
+    active_model = model_manager.active_model.value if model_manager.active_model else "None"
+    mode = f"{active_model.upper()}" + (" + Real Video" if using_real_vision else " + Simulated Video")
+    print(f"\n🛡️  AUTONOMOUS SHIELD - {mode}")
     print("="*60)
 
 @app.on_event("shutdown")
@@ -156,19 +172,23 @@ async def shutdown():
 @app.get("/api/ai/status")
 async def get_model_status():
     """Get AI model status and statistics"""
-    mode = "Real YOLOv8" if using_real_vision else "Mock Detector"
-    stats = {}
+    if not model_manager:
+        return {"error": "Model manager not initialized"}
     
+    model_status = model_manager.get_model_status()
+    active_model = model_manager.active_model
+    
+    stats = {}
     if vision_engine:
          stats = vision_engine.analyze()["stats"]
 
     return {
         "model": {
-            "name": "YOLOv8-Nano",
-            "mode": mode,
-            "status": "loaded" if using_real_vision else "mock",
+            "name": active_model.value.upper() if active_model else "None",
+            "mode": active_model.value if active_model else "unknown",
+            "status": model_status["models"][active_model.value]["status"] if active_model else "unloaded",
             "confidence_threshold": 0.50,
-            "input_resolution": stats.get('res', 'Unknown'),
+            "input_resolution": stats.get('res', '1280x720'),
             "inference_time": "~15ms",
             "edge_optimized": True,
             "video_source": str(VIDEO_SOURCE) if VIDEO_SOURCE else "None",
@@ -179,6 +199,8 @@ async def get_model_status():
             "fps": stats.get('fps', 0),
             "status": stats.get('status', 'unknown')
         },
+        "available_models": model_manager.get_available_models(),
+        "all_models": model_status,
         "classes": ["human", "vehicle", "weapon"],
         "threat_levels": ["normal", "suspicious", "critical"]
     }
@@ -215,6 +237,77 @@ async def detect_frame():
         "alerts": alerts,
         "timestamp": datetime.utcnow().isoformat()
     }
+
+
+@app.get("/api/ai/models")
+async def get_available_models():
+    """Get list of all available AI models and their status"""
+    if not model_manager:
+        return {"error": "Model manager not initialized"}
+    
+    return model_manager.get_model_status()
+
+
+@app.post("/api/ai/models/select")
+async def select_model(model_type: str):
+    """
+    Switch to a different AI model
+    
+    Args:
+        model_type: Model to switch to (yolo26, rfdetr, sam2, rtmdet, mock)
+    """
+    if not model_manager:
+        raise HTTPException(status_code=503, detail="Model manager not initialized")
+    
+    try:
+        model_enum = ModelType(model_type.lower())
+    except ValueError:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid model type. Available: {[m.value for m in ModelType]}"
+        )
+    
+    success = model_manager.set_active_model(model_enum)
+    
+    if success:
+        return {
+            "success": True,
+            "active_model": model_type,
+            "message": f"Switched to {model_type} model"
+        }
+    else:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to load {model_type} model"
+        )
+
+
+@app.get("/api/ai/models/{model_type}/info")
+async def get_model_info(model_type: str):
+    """Get detailed information about a specific model"""
+    if not model_manager:
+        raise HTTPException(status_code=503, detail="Model manager not initialized")
+    
+    try:
+        model_enum = ModelType(model_type.lower())
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid model type")
+    
+    if model_enum not in model_manager.models:
+        raise HTTPException(status_code=404, detail=f"Model {model_type} not loaded")
+    
+    model = model_manager.models[model_enum]
+    
+    # Get model-specific info if available
+    if hasattr(model, 'get_model_info'):
+        return model.get_model_info()
+    else:
+        return {
+            "name": model_type,
+            "status": model_manager.model_status[model_enum].value,
+            "performance": model_manager.performance_stats[model_enum]
+        }
+
 
 # MJPEG Streaming Generator
 def generate_frames():
@@ -271,8 +364,8 @@ async def websocket_stream(websocket: WebSocket):
                  detections = analysis["detections"]
                  current_frame_id = frame_count
             else:
-                # Mock fallback
-                detections = detector.detect_frame()
+                # Use Model Manager for detection
+                detections = model_manager.detect() if model_manager else []
                 current_frame_id = frame_count
 
             # Send frame analysis

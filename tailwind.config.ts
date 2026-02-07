@@ -83,8 +83,10 @@ export default {
         },
       },
       fontFamily: {
-        sans: ["Inter", "sans-serif"],
-        mono: ["Roboto Mono", "monospace"],
+        sans: ["Geist", "Inter", "sans-serif"],
+        mono: ["JetBrains Mono", "Roboto Mono", "monospace"],
+        display: ["Oxanium", "Space Grotesk", "sans-serif"],
+        tech: ["Space Mono", "monospace"],
       },
       keyframes: {
         "accordion-down": {

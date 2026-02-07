@@ -1,0 +1,42 @@
+{
+    "models": {
+        "yolo26": {
+            "enabled": true,
+            "confidence_threshold": 0.50,
+            "device": "cpu",
+            "batch_size": 1,
+            "nms_free": true
+        },
+        "rfdetr": {
+            "enabled": false,
+            "confidence_threshold": 0.55,
+            "device": "cpu",
+            "use_tensorrt": false
+        },
+        "sam2": {
+            "enabled": false,
+            "prompt_mode": "auto",
+            "device": "cpu"
+        },
+        "rtmdet": {
+            "enabled": false,
+            "confidence_threshold": 0.50,
+            "device": "cpu",
+            "max_fps": 300
+        },
+        "mock": {
+            "enabled": true,
+            "confidence_threshold": 0.60
+        }
+    },
+    "ensemble": {
+        "enabled": false,
+        "voting_strategy": "weighted",
+        "min_agreement": 2
+    },
+    "performance": {
+        "target_fps": 30,
+        "max_latency_ms": 100,
+        "adaptive_quality": true
+    }
+}
