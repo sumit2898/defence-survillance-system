@@ -10,21 +10,29 @@ import {
   Menu,
   X,
   Film,
-  Map
+  Map,
+  Layers3,
+  Brain,
+  Shield,
+  Eye,
+  AlertTriangle,
+  FileText
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useIsMobile } from "@/hooks/use-mobile";
 
+
 const navItems = [
-  { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-  { href: "/monitoring", label: "Live Monitoring", icon: Video },
-  { href: "/playback", label: "Playback", icon: Film },
-  { href: "/map", label: "Geo-Map", icon: Map },
-  { href: "/alerts", label: "Alerts", icon: ShieldAlert },
-  { href: "/devices", label: "Assets", icon: HardDrive },
-  { href: "/logs", label: "Logs", icon: Activity },
+  { href: "/", label: "🛡️ Autonomous Shield", icon: Shield },
+  { href: "/analytics", label: "Neural Analytics", icon: Brain },
+  { href: "/tactical", label: "Tactical 3D", icon: Layers3 },
+  { href: "/map", label: "Map View", icon: Map },
+  { href: "/monitoring", label: "Monitoring", icon: Eye },
+  { href: "/alerts", label: "Alerts", icon: AlertTriangle },
+  { href: "/devices", label: "Devices", icon: HardDrive },
+  { href: "/logs", label: "Logs", icon: FileText },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -52,12 +60,12 @@ export function Sidebar() {
             exit={{ x: -280 }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
             className={cn(
-              "fixed inset-y-0 left-0 z-40 w-64 bg-card border-r border-white/5 flex flex-col",
+              "fixed inset-y-0 left-0 z-40 w-64 bg-black border-r border-white/5 flex flex-col",
               "md:relative md:translate-x-0"
             )}
           >
             {/* Header */}
-            <div className="h-20 flex items-center px-6 border-b border-white/5 bg-white/[0.02]">
+            <div className="h-20 flex items-center px-6 border-b border-white/5 bg-zinc-950">
               <div className="relative mr-4">
                 <div className="absolute inset-0 bg-red-500/20 blur-sm animate-pulse rounded" />
                 <div className="relative w-10 h-10 bg-zinc-900 border border-white/10 rounded flex items-center justify-center overflow-hidden">
@@ -139,7 +147,7 @@ export function Sidebar() {
             </div>
 
             {/* Footer */}
-            <div className="p-6 border-t border-white/5 bg-white/[0.01]">
+            <div className="p-6 border-t border-white/5 bg-zinc-950">
               <div className="flex items-center px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 hover:text-white cursor-pointer rounded border border-transparent hover:border-white/10 hover:bg-white/5 transition-all mb-4" onClick={() => window.location.href = '/'}>
                 <LogOut className="mr-3 h-4 w-4" />
                 DISCONNECT

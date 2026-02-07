@@ -1,11 +1,12 @@
 import { Layout } from "@/components/Layout";
 import { useDevices } from "@/hooks/use-devices";
-import { HardDrive, Battery, Signal, WifiOff, Filter, Search, Camera, Plane, Activity, Server, Database, Plus, RefreshCw, X, ChevronRight, Cpu, Thermometer, Zap, CheckSquare, Square, Trash2, Power, Terminal } from "lucide-react";
+import { HardDrive, Battery, Signal, WifiOff, Filter, Search, Camera, Plane, Activity, Server, Database, Plus, RefreshCw, X, ChevronRight, Cpu, Thermometer, Zap, CheckSquare, Square, Trash2, Power, Terminal, PieChart as PieChartIcon } from "lucide-react";
+import { PieChart, Pie, Cell, ResponsiveContainer, ComposedChart, Line, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Area, AreaChart } from 'recharts';
 import { cn } from "@/lib/utils";
 import { PageTransition } from "@/components/ui/PageTransition";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+
 
 // Mock data for the detailed view graph
 const mockTelemetryData = Array.from({ length: 20 }, (_, i) => ({
@@ -28,6 +29,7 @@ export default function Devices() {
   const { data: devices } = useDevices();
   const [filter, setFilter] = useState<'all' | 'online' | 'offline'>('all');
   const [search, setSearch] = useState("");
+  const handleSimulatedAction = (action: string) => console.log("Action:", action);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [viewDevice, setViewDevice] = useState<any>(null); // Selecting a device for detailed view
 
@@ -86,6 +88,83 @@ export default function Devices() {
               <div className="flex flex-col items-center relative z-10">
                 <span className="text-red-500 text-[9px] font-black uppercase tracking-widest mb-1">OFFLINE_NODES</span>
                 <span className="text-3xl font-black text-white tracking-tighter">{offlineCount}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Device Analytics Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Status Breakdown */}
+            <div className="bg-black/60 backdrop-blur-xl border border-white/10 rounded-xl p-4 flex flex-col relative shadow-xl h-48">
+              <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-white/20" />
+              <div className="flex items-center gap-2 mb-2">
+                <PieChartIcon className="w-4 h-4 text-cyan-500" />
+                <h3 className="text-xs font-black tracking-wider uppercase text-white">FLEET_STATUS_MATRIX</h3>
+              </div>
+              <div className="flex-1 w-full flex items-center">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'Online', value: onlineCount, color: '#22c55e' },
+                        { name: 'Offline', value: offlineCount, color: '#ef4444' },
+                        { name: 'Maintenance', value: 3, color: '#f59e0b' },
+                      ]}
+                      innerRadius={40}
+                      outerRadius={60}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      <Cell fill="#22c55e" />
+                      <Cell fill="#ef4444" />
+                      <Cell fill="#f59e0b" />
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#000000dd', border: '1px solid #ffffff20', borderRadius: '4px', fontSize: '12px' }}
+                      itemStyle={{ color: '#fff' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex flex-col gap-2 ml-4">
+                  <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400">
+                    <div className="w-2 h-2 bg-green-500 rounded-full" /> ONLINE ({onlineCount})
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400">
+                    <div className="w-2 h-2 bg-red-500 rounded-full" /> OFFLINE ({offlineCount})
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400">
+                    <div className="w-2 h-2 bg-amber-500 rounded-full" /> MAINT (3)
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Resource Usage Trend */}
+            <div className="bg-black/60 backdrop-blur-xl border border-white/10 rounded-xl p-4 flex flex-col relative shadow-xl h-48">
+              <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-white/20" />
+              <div className="flex items-center gap-2 mb-2">
+                <Cpu className="w-4 h-4 text-cyan-500" />
+                <h3 className="text-xs font-black tracking-wider uppercase text-white">RESOURCE_LOAD_INDEX</h3>
+              </div>
+              <div className="flex-1 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={mockTelemetryData}>
+                    <defs>
+                      <linearGradient id="colorCpu" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
+                    <XAxis dataKey="time" stroke="#52525b" fontSize={10} tickLine={false} axisLine={false} />
+                    <Tooltip
+                      cursor={{ fill: '#ffffff10' }}
+                      contentStyle={{ backgroundColor: '#000000dd', border: '1px solid #ffffff20', borderRadius: '4px', fontSize: '12px' }}
+                    />
+                    <Area type="monotone" dataKey="bandwidth" stroke="#22c55e" fillOpacity={0.1} fill="#22c55e" />
+                    <Line type="monotone" dataKey="cpu" stroke="#8b5cf6" strokeWidth={2} dot={false} />
+                  </ComposedChart>
+                </ResponsiveContainer>
               </div>
             </div>
           </div>

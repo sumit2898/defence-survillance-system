@@ -1,6 +1,7 @@
 import { Layout } from "@/components/Layout";
 import { useAlerts } from "@/hooks/use-alerts";
-import { AlertTriangle, Filter, Download, Shield, Clock, MapPin, Search, AlertOctagon, CheckCircle2, Calendar, Archive, Eye, X, Crosshair } from "lucide-react";
+import { AlertTriangle, Filter, Download, Shield, Clock, MapPin, Search, AlertOctagon, CheckCircle2, Calendar, Archive, Eye, X, Crosshair, BarChart3, PieChart as PieChartIcon } from "lucide-react";
+import { BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { format } from "date-fns";
 import { PageTransition } from "@/components/ui/PageTransition";
 import { cn } from "@/lib/utils";
@@ -71,7 +72,80 @@ export default function Alerts() {
           </div>
         </div>
 
-        <div className="bg-black/60 backdrop-blur-xl border border-white/10 rounded-xl overflow-hidden flex flex-col min-h-[600px] shadow-2xl relative">
+        {/* Analytics Row */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Severity Distribution */}
+          <div className="bg-black/60 backdrop-blur-xl border border-white/10 rounded-xl p-4 flex flex-col relative shadow-xl h-48">
+            <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-white/20" />
+            <div className="flex items-center gap-2 mb-2">
+              <PieChartIcon className="w-4 h-4 text-cyan-500" />
+              <h3 className="text-xs font-black tracking-wider uppercase text-white">THREAT_DISTRIBUTION</h3>
+            </div>
+            <div className="flex-1 w-full flex items-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: 'Critical', value: 35, color: '#ef4444' },
+                      { name: 'Warning', value: 45, color: '#f59e0b' },
+                      { name: 'Info', value: 20, color: '#06b6d4' },
+                    ]}
+                    innerRadius={40}
+                    outerRadius={60}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    <Cell fill="#ef4444" />
+                    <Cell fill="#f59e0b" />
+                    <Cell fill="#06b6d4" />
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#000000dd', border: '1px solid #ffffff20', borderRadius: '4px', fontSize: '12px' }}
+                    itemStyle={{ color: '#fff' }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="flex flex-col gap-2 ml-4">
+                <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400">
+                  <div className="w-2 h-2 bg-red-500 rounded-full" /> CRITICAL (35%)
+                </div>
+                <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400">
+                  <div className="w-2 h-2 bg-amber-500 rounded-full" /> WARNING (45%)
+                </div>
+                <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400">
+                  <div className="w-2 h-2 bg-cyan-500 rounded-full" /> INFO (20%)
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Frequency Heatmap */}
+          <div className="bg-black/60 backdrop-blur-xl border border-white/10 rounded-xl p-4 flex flex-col relative shadow-xl h-48">
+            <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-white/20" />
+            <div className="flex items-center gap-2 mb-2">
+              <BarChart3 className="w-4 h-4 text-cyan-500" />
+              <h3 className="text-xs font-black tracking-wider uppercase text-white">EVENT_FREQUENCY_24H</h3>
+            </div>
+            <div className="flex-1 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={[
+                  { time: '00', count: 12 }, { time: '04', count: 8 },
+                  { time: '08', count: 24 }, { time: '12', count: 45 },
+                  { time: '16', count: 32 }, { time: '20', count: 18 },
+                ]}>
+                  <XAxis dataKey="time" stroke="#52525b" fontSize={10} tickLine={false} axisLine={false} />
+                  <Tooltip
+                    cursor={{ fill: '#ffffff10' }}
+                    contentStyle={{ backgroundColor: '#000000dd', border: '1px solid #ffffff20', borderRadius: '4px', fontSize: '12px' }}
+                  />
+                  <Bar dataKey="count" fill="#06b6d4" radius={[2, 2, 0, 0]} barSize={30} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-black/60 backdrop-blur-xl border border-white/10 rounded-xl flex flex-col shadow-2xl relative">
           {/* HUD Accents */}
           <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-white/20" />
           <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-white/20" />
@@ -107,7 +181,7 @@ export default function Alerts() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-2">
+          <div className="flex-1 p-2 space-y-2">
             <AnimatePresence mode="popLayout">
               {filteredAlerts?.map((alert) => (
                 <motion.div

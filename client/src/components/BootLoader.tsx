@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { Terminal, Shield, Cpu, Wifi } from "lucide-react";
 
-export function BootLoader({ onComplete }: { onComplete: () => void }) {
+export function BootLoader({ onComplete }: { onComplete?: () => void }) {
     const [step, setStep] = useState(0);
     const [logs, setLogs] = useState<string[]>([]);
 
@@ -25,7 +25,7 @@ export function BootLoader({ onComplete }: { onComplete: () => void }) {
                 setLogs(prev => [...prev, bootSequence[i].text]);
                 setStep(i);
             }
-            setTimeout(onComplete, 800);
+            if (onComplete) setTimeout(onComplete, 800);
         };
 
         runSequence();

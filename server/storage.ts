@@ -1,6 +1,5 @@
 // import { db } from "./db"; // DB disabled for local run
 import {
-  alerts, devices, incidents, logs,
   type Alert, type InsertAlert,
   type Device, type InsertDevice,
   type Incident, type InsertIncident,

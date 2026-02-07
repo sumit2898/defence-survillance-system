@@ -3,8 +3,9 @@ import { useLogs } from "@/hooks/use-logs";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { PageTransition } from "@/components/ui/PageTransition";
-import { Search, Download, RefreshCcw, Terminal, Activity, FileText, Play, Pause, X, ChevronRight, Cpu } from "lucide-react";
+import { Search, Download, RefreshCcw, Terminal, Activity, FileText, Play, Pause, X, ChevronRight, Cpu, BarChart3, PieChart as PieIcon } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
+import { LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function Logs() {
@@ -82,6 +83,82 @@ export default function Logs() {
             </div>
           </div>
 
+          {/* Log Analytics Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Event Volume Trend */}
+            <div className="bg-black/60 backdrop-blur-xl border border-white/10 rounded-xl p-4 flex flex-col relative shadow-xl h-48">
+              <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-white/20" />
+              <div className="flex items-center gap-2 mb-2">
+                <Activity className="w-4 h-4 text-blue-500" />
+                <h3 className="text-xs font-black tracking-wider uppercase text-white">EVENT_THROUGHPUT_HZ</h3>
+              </div>
+              <div className="flex-1 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={[
+                    { time: '00', events: 120 }, { time: '04', events: 140 },
+                    { time: '08', events: 250 }, { time: '12', events: 450 },
+                    { time: '16', events: 380 }, { time: '20', events: 180 },
+                  ]}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
+                    <XAxis dataKey="time" stroke="#52525b" fontSize={10} tickLine={false} axisLine={false} />
+                    <Tooltip
+                      cursor={{ stroke: '#ffffff20' }}
+                      contentStyle={{ backgroundColor: '#000000dd', border: '1px solid #ffffff20', borderRadius: '4px', fontSize: '12px' }}
+                    />
+                    <Line type="step" dataKey="events" stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: '#3b82f6' }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Event Type Breakdown */}
+            <div className="bg-black/60 backdrop-blur-xl border border-white/10 rounded-xl p-4 flex flex-col relative shadow-xl h-48">
+              <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-white/20" />
+              <div className="flex items-center gap-2 mb-2">
+                <PieIcon className="w-4 h-4 text-blue-500" />
+                <h3 className="text-xs font-black tracking-wider uppercase text-white">PROTOCOL_DISTRIBUTION</h3>
+              </div>
+              <div className="flex-1 w-full flex items-center">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'AUTH', value: 350, color: '#3b82f6' },
+                        { name: 'SYSTEM', value: 450, color: '#10b981' },
+                        { name: 'NETWORK', value: 200, color: '#f59e0b' },
+                        { name: 'ERROR', value: 50, color: '#ef4444' },
+                      ]}
+                      innerRadius={40}
+                      outerRadius={60}
+                      paddingAngle={2}
+                      dataKey="value"
+                    >
+                      <Cell fill="#3b82f6" />
+                      <Cell fill="#10b981" />
+                      <Cell fill="#f59e0b" />
+                      <Cell fill="#ef4444" />
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#000000dd', border: '1px solid #ffffff20', borderRadius: '4px', fontSize: '12px' }}
+                      itemStyle={{ color: '#fff' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex flex-col gap-2 ml-4">
+                  <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full" /> AUTH
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400">
+                    <div className="w-2 h-2 bg-emerald-500 rounded-full" /> SYS
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400">
+                    <div className="w-2 h-2 bg-red-500 rounded-full" /> ERR
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="flex gap-4 items-center">
             <button
               onClick={() => setIsLive(!isLive)}
@@ -108,7 +185,7 @@ export default function Logs() {
         </div>
 
         {/* Logs Terminal */}
-        <div className="flex-1 bg-black/60 backdrop-blur-xl border border-white/10 rounded-xl overflow-hidden flex flex-col font-mono text-sm relative shadow-2xl z-10">
+        <div className="flex-1 bg-black/60 backdrop-blur-xl border border-white/10 rounded-xl flex flex-col font-mono text-sm relative shadow-2xl z-10">
           {/* HUD Accents */}
           <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-white/20" />
           <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-white/20" />
@@ -132,7 +209,7 @@ export default function Logs() {
           </div>
 
           {/* Log Stream */}
-          <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar relative font-mono text-xs">
+          <div ref={scrollRef} className="flex-1 p-4 space-y-1 relative font-mono text-xs">
             <AnimatePresence initial={false}>
               {filteredLogs.map((log) => (
                 <motion.div

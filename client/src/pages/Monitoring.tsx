@@ -3,16 +3,19 @@ import { useDevices } from "@/hooks/use-devices";
 import { FeedPlayer } from "@/components/FeedPlayer";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
-import { Search, Radio, Activity, LayoutGrid, Maximize2, Database } from "lucide-react";
+import { Search, Radio, Activity, LayoutGrid, Maximize2, Database, ChevronRight, ChevronLeft } from "lucide-react";
 import { useState } from "react";
 import { PageTransition } from "@/components/ui/PageTransition";
 import { motion, AnimatePresence } from "framer-motion";
+import { SystemPulse } from "@/components/SystemPulse";
+import { DetectionLog } from "@/components/DetectionLog";
 
 export default function Monitoring() {
   const { data: devices } = useDevices();
   const { activeFeedId, setActiveFeed } = useStore();
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<'focus' | 'grid'>('focus');
+  const [rightPanelOpen, setRightPanelOpen] = useState(true);
 
   const activeDevice = devices?.find(d => d.id === activeFeedId) || devices?.[0];
   const filteredDevices = devices?.filter(d =>
@@ -21,15 +24,15 @@ export default function Monitoring() {
   );
 
   return (
-    <Layout className="p-0 flex h-full overflow-hidden">
-      {/* Sidebar List (Only in Focus Mode) */}
+    <Layout fixedHeight={true} className="p-0 flex h-full overflow-hidden">
+      {/* LEFT SIDEBAR: Device List (Only in Focus Mode) */}
       <AnimatePresence mode="wait">
         {viewMode === 'focus' && (
           <motion.div
             initial={{ width: 0, opacity: 0 }}
             animate={{ width: 320, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
-            className="border-r border-white/5 bg-black/40 backdrop-blur-xl flex flex-col h-full z-20 overflow-hidden relative"
+            className="border-r border-white/5 bg-black/40 backdrop-blur-xl flex flex-col h-full z-20 overflow-hidden relative shrink-0"
           >
             {/* HUD Accents */}
             <div className="absolute top-0 right-0 w-1 h-full bg-gradient-to-b from-transparent via-green-500/20 to-transparent opacity-30" />
@@ -101,8 +104,8 @@ export default function Monitoring() {
         )}
       </AnimatePresence>
 
-      {/* Main View */}
-      <PageTransition className="flex-1 bg-black p-4 flex flex-col relative overflow-hidden">
+      {/* CENTER: Main View */}
+      <PageTransition className="flex-1 bg-black p-4 flex flex-col relative overflow-hidden min-w-0">
         {/* Scanning Line Overlay */}
         <div className="absolute inset-0 pointer-events-none z-10 opacity-10 flex flex-col gap-1 overflow-hidden">
           {Array.from({ length: 40 }).map((_, i) => (
@@ -111,43 +114,55 @@ export default function Monitoring() {
         </div>
 
         {/* View Toggle Header */}
-        <div className="flex justify-between items-center mb-6 z-20">
+        <div className="flex justify-between items-center mb-4 z-20 shrink-0">
           <div className="flex items-center gap-4">
             <div className="px-3 py-1 bg-green-500/10 border border-green-500/20 rounded text-[10px] font-mono text-green-500 flex items-center gap-2">
               <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
               MATRIX_STABLE
             </div>
-            <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">FPS: 60 // PING: 24ms</span>
+            <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest hidden md:inline">FPS: 60 // PING: 24ms</span>
           </div>
 
-          <div className="bg-black/80 backdrop-blur-md rounded p-1 flex border border-white/10 shadow-2xl">
+          <div className="flex items-center gap-2">
+            <div className="bg-black/80 backdrop-blur-md rounded p-1 flex border border-white/10 shadow-2xl">
+              <button
+                onClick={() => setViewMode('focus')}
+                className={cn("p-2 rounded transition-all duration-300",
+                  viewMode === 'focus' ? "bg-white/10 text-white shadow-inner" : "text-zinc-600 hover:text-white"
+                )}
+                title="Focus View"
+              >
+                <Maximize2 className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('grid')}
+                className={cn("p-2 rounded transition-all duration-300",
+                  viewMode === 'grid' ? "bg-white/10 text-white shadow-inner" : "text-zinc-600 hover:text-white"
+                )}
+                title="Grid View"
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+            </div>
+
             <button
-              onClick={() => setViewMode('focus')}
-              className={cn("p-2 rounded transition-all duration-300",
-                viewMode === 'focus' ? "bg-white/10 text-white shadow-inner" : "text-zinc-600 hover:text-white"
+              onClick={() => setRightPanelOpen(!rightPanelOpen)}
+              className={cn(
+                "p-2.5 rounded bg-black/80 border border-white/10 hover:bg-white/5 transition-colors text-zinc-400 hover:text-white",
+                rightPanelOpen && "bg-white/10 text-white"
               )}
-              title="Focus View"
             >
-              <Maximize2 className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setViewMode('grid')}
-              className={cn("p-2 rounded transition-all duration-300",
-                viewMode === 'grid' ? "bg-white/10 text-white shadow-inner" : "text-zinc-600 hover:text-white"
-              )}
-              title="Grid View"
-            >
-              <LayoutGrid className="h-4 w-4" />
+              {rightPanelOpen ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
             </button>
           </div>
         </div>
 
         {viewMode === 'focus' ? (
           activeDevice ? (
-            <>
+            <div className="flex-1 flex flex-col min-h-0">
               <motion.div
                 layout
-                className="flex-1 relative rounded-xl overflow-hidden border border-white/10 bg-zinc-950 group shadow-2xl"
+                className="flex-1 relative rounded-xl overflow-hidden border border-white/10 bg-zinc-950 group shadow-2xl min-h-0"
               >
                 {/* HUD Corner Overlays */}
                 <div className="absolute top-6 left-6 w-16 h-16 border-t-2 border-l-2 border-white/20 rounded-tl-xl z-20 pointer-events-none group-hover:border-green-500/40 transition-colors" />
@@ -188,74 +203,69 @@ export default function Monitoring() {
                 </div>
               </motion.div>
 
-              {/* Metadata Panel */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="h-56 mt-6 grid grid-cols-4 gap-6"
-              >
-                <div className="col-span-3 bg-black/60 backdrop-blur-xl border border-white/10 rounded-xl p-6 relative overflow-hidden shadow-xl group">
+              {/* Metadata Panel - Optional, hidden if space is tight */}
+              <div className="h-auto mt-4 hidden xl:grid grid-cols-4 gap-4 shrink-0">
+                <div className="col-span-3 bg-black/60 backdrop-blur-xl border border-white/10 rounded-xl p-4 relative overflow-hidden shadow-xl group">
                   <div className="absolute top-0 right-0 p-[2px] bg-gradient-to-l from-green-500/40 to-transparent w-full h-[1px]" />
                   <div className="absolute inset-0 bg-gradient-to-br from-white/[0.01] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
 
-                  <h3 className="text-xs font-black text-white mb-6 uppercase tracking-[0.2em] flex items-center gap-3">
-                    <Activity className="h-4 w-4 text-green-500" />
+                  <h3 className="text-[10px] font-black text-white mb-4 uppercase tracking-[0.2em] flex items-center gap-3">
+                    <Activity className="h-3 w-3 text-green-500" />
                     TELEMETRY_DATABANK
                   </h3>
 
-                  <div className="grid grid-cols-3 gap-8 text-[10px] font-mono">
-                    <div className="space-y-4">
-                      <div className="flex justify-between border-b border-white/5 pb-2 group/item">
-                        <span className="text-zinc-500 group-hover/item:text-zinc-300 transition-colors uppercase">LATENCY</span>
+                  <div className="grid grid-cols-3 gap-6 text-[10px] font-mono">
+                    <div className="space-y-2">
+                      <div className="flex justify-between border-b border-white/5 pb-1">
+                        <span className="text-zinc-500 uppercase">LATENCY</span>
                         <span className="text-green-500 font-bold">24.08ms</span>
                       </div>
-                      <div className="flex justify-between border-b border-white/5 pb-2 group/item">
-                        <span className="text-zinc-500 group-hover/item:text-zinc-300 transition-colors uppercase">RESOLUTION</span>
-                        <span className="text-white font-bold">2160p / UHD</span>
+                      <div className="flex justify-between border-b border-white/5 pb-1">
+                        <span className="text-zinc-500 uppercase">RES</span>
+                        <span className="text-white font-bold">UHD</span>
                       </div>
                     </div>
-                    <div className="space-y-4">
-                      <div className="flex justify-between border-b border-white/5 pb-2 group/item">
-                        <span className="text-zinc-500 group-hover/item:text-zinc-300 transition-colors uppercase">IP_ADDR</span>
+                    <div className="space-y-2">
+                      <div className="flex justify-between border-b border-white/5 pb-1">
+                        <span className="text-zinc-500 uppercase">IP</span>
                         <span className="text-blue-400 font-bold">{activeDevice.ipAddress || "10.0.4.88"}</span>
                       </div>
-                      <div className="flex justify-between border-b border-white/5 pb-2 group/item">
-                        <span className="text-zinc-500 group-hover/item:text-zinc-300 transition-colors uppercase">UPLINK_BAND</span>
-                        <span className="text-white font-bold">5.8 GHz</span>
+                      <div className="flex justify-between border-b border-white/5 pb-1">
+                        <span className="text-zinc-500 uppercase">BAND</span>
+                        <span className="text-white font-bold">5.8G</span>
                       </div>
                     </div>
-                    <div className="space-y-4">
-                      <div className="flex justify-between border-b border-white/5 pb-2 group/item">
-                        <span className="text-zinc-500 group-hover/item:text-zinc-300 transition-colors uppercase">PROCESSOR</span>
-                        <span className="text-orange-400 font-bold">A50-T CORE</span>
+                    <div className="space-y-2">
+                      <div className="flex justify-between border-b border-white/5 pb-1">
+                        <span className="text-zinc-500 uppercase">CPU</span>
+                        <span className="text-orange-400 font-bold">A50-T</span>
                       </div>
-                      <div className="flex justify-between border-b border-white/5 pb-2 group/item">
-                        <span className="text-zinc-500 group-hover/item:text-zinc-300 transition-colors uppercase">FIRMWARE</span>
-                        <span className="text-white font-bold">v4.2.1-X</span>
+                      <div className="flex justify-between border-b border-white/5 pb-1">
+                        <span className="text-zinc-500 uppercase">VER</span>
+                        <span className="text-white font-bold">v4.2</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-black/80 backdrop-blur-xl border border-white/10 rounded-xl p-6 flex flex-col justify-center items-center text-center relative overflow-hidden group shadow-xl">
+                <div className="bg-black/80 backdrop-blur-xl border border-white/10 rounded-xl p-4 flex flex-col justify-center items-center text-center relative overflow-hidden group shadow-xl">
                   {/* Glowing background */}
                   <div className="absolute inset-0 bg-green-500/5 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
 
                   <div className="relative">
-                    <div className="text-5xl font-black text-white font-mono tracking-tighter mb-1 relative z-10">98<span className="text-green-500">.4</span></div>
+                    <div className="text-3xl font-black text-white font-mono tracking-tighter mb-1 relative z-10">98<span className="text-green-500">.4</span></div>
                     <motion.div
                       animate={{ height: ["10%", "98%"] }}
                       transition={{ duration: 2, repeat: Infinity, repeatType: "reverse" }}
-                      className="absolute -right-4 top-0 w-1 bg-green-500/20 rounded-full overflow-hidden"
+                      className="absolute -right-3 top-0 w-1 bg-green-500/20 rounded-full overflow-hidden"
                     >
                       <div className="w-full h-full bg-green-500 animate-pulse" />
                     </motion.div>
                   </div>
-                  <div className="text-[9px] text-zinc-500 uppercase tracking-[0.3em] font-black relative z-10 mt-2">CONF_SCORE</div>
+                  <div className="text-[8px] text-zinc-500 uppercase tracking-[0.3em] font-black relative z-10">CONF_SCORE</div>
                 </div>
-              </motion.div>
-            </>
+              </div>
+            </div>
           ) : (
             <div className="flex-1 flex items-center justify-center text-muted-foreground">
               Select a feed to begin monitoring
@@ -289,6 +299,28 @@ export default function Monitoring() {
           </div>
         )}
       </PageTransition>
+
+      {/* RIGHT SIDEBAR: System Pulse & Logs */}
+      <AnimatePresence>
+        {rightPanelOpen && (
+          <motion.div
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: 300, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            className="shrink-0 flex flex-col h-full z-20 overflow-hidden"
+          >
+            {/* System Pulse Top */}
+            <div className="h-1/3 min-h-[250px] p-2 pr-0">
+              <SystemPulse />
+            </div>
+
+            {/* Detection Log Bottom */}
+            <div className="flex-1 min-h-0 relative">
+              <DetectionLog />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </Layout>
   );
 }
