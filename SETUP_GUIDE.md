@@ -30,22 +30,19 @@ python main.py
 ```
 *The service will start on http://localhost:8000*
 
-## 3. Setup Client (Frontend)
-Open a **new** terminal in the `client` folder:
-```bash
-cd client
-```
+## 3. Setup Client & Server (Frontend/Backend)
+Open a **new** terminal in the **root** folder (`autonomous-shield`):
 
 ### Install Dependencies
 ```bash
 npm install
 ```
 
-### Run the Client
+### Run the Application
 ```bash
 npm run dev
 ```
-*The dashboard will open at http://localhost:5173 (or similar)*
+*This starts the main application server.*
 
 ## Troubleshooting
 -   **Camera Issue:** If the camera doesn't start, check `ai-service/main.py` and set `VIDEO_SOURCE = 0`.
