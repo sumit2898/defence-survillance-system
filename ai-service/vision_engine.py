@@ -283,11 +283,16 @@ class VisionEngine:
                     # Run Heavy AI if needed
                     if should_run_ai:
                         # Facial Recognition Hook
-                        if label == 'person' and self.face_recognizer.is_active:
-                             if conf > 0.6: # Lowered threshold slightly for re-checks
+                        if label == 'person':
+                             # Debug: Print status once every 60 frames to avoid spam, or just print always for now
+                             # print(f"👤 Person detected. Active: {self.face_recognizer.is_active} | Conf: {conf:.2f}") 
+                             
+                             if self.face_recognizer.is_active and conf > 0.4: 
+                                 print(f"👤 Calling Identify... (Conf: {conf:.2f})") # FORCE PRINT
                                  name = self.face_recognizer.identify(frame, [int(x1), int(y1), int(x2), int(y2)])
                                  if name != "Unknown":
                                      person_name = name
+                                     print(f"🎯 FACE RECOGNIZED: {name}")  # Debug log
 
                         # ALPR Hook (Vehicle Recognition)
                         vehicle_classes = ['car', 'truck', 'bus', 'motorcycle']
@@ -307,9 +312,8 @@ class VisionEngine:
                     
                     # Apply Logic (using either new or cached data)
                     if person_name and person_name != "Unknown":
-                        final_label = person_name
-                        if "intruder" in person_name.lower(): threat_level = "critical"
-                        else: threat_level = "normal"
+                        final_label = f"SUSPECT: {person_name}"
+                        threat_level = "critical"  # All recognized suspects are critical threats
                     
                     if plate_text:
                         final_label = f"{label} [{plate_text}]"
@@ -371,24 +375,167 @@ except ImportError:
     OCR_AVAILABLE = False
     print("⚠️  easyocr not installed. Skipping ALPR.")
 
-try:
-    import face_recognition
-    FACE_REC_AVAILABLE = True
-except ImportError:
-    FACE_REC_AVAILABLE = False
-    print("⚠️  face_recognition not installed. Skipping facial recognition.")
+# ==============================================================================
+# FACIAL RECOGNITION MODULE (OpenCV-based, no dlib required)
+# ==============================================================================
 
 import os
 
 class FaceRecognizer:
     def __init__(self, known_faces_dir="assets/known_faces"):
-        self.known_encodings = []
+        self.known_faces = {}  # {name: face_image}
         self.known_names = []
         self.is_active = False
+        self.face_cascade = None
         
-        if FACE_REC_AVAILABLE:
+        # Load Haar Cascade for face detection
+        try:
+            # Try 'alt2' which is often more robust than default
+            cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_alt2.xml'
+            if not os.path.exists(cascade_path):
+                cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+                
+            self.face_cascade = cv2.CascadeClassifier(cascade_path)
             self._load_known_faces(known_faces_dir)
-# ... (rest of FaceRecognizer)
+        except Exception as e:
+            print(f"❌ Face Cascade Load Failed: {e}")
+            
+    def reload(self):
+        """Reload known faces from disk"""
+        print("🔄 Reloading Facial Database...")
+        self.known_faces = {}
+        self.known_names = []
+        self.is_active = False
+        self._load_known_faces("assets/known_faces")
+
+    def _load_known_faces(self, directory):
+        if not os.path.exists(directory):
+            os.makedirs(directory, exist_ok=True)
+            print(f"📁 Created known_faces directory: {directory}")
+            return
+
+        print(f"👤 Loading Known Faces from {directory}...")
+        for filename in os.listdir(directory):
+            if filename.endswith((".jpg", ".png", ".jpeg")):
+                path = os.path.join(directory, filename)
+                try:
+                    # Load image
+                    image = cv2.imread(path)
+                    if image is None:
+                        print(f"  ❌ Failed to load {filename}: Invalid image")
+                        continue
+                    
+                    # Convert to grayscale
+                    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+                    
+                    # Detect face
+                    faces = self.face_cascade.detectMultiScale(gray, 1.3, 5)
+                    
+                    if len(faces) == 0:
+                        print(f"  ❌ No face detected in {filename}")
+                        continue
+                    
+                    # Use the first detected face
+                    (x, y, w, h) = faces[0]
+                    face_roi = gray[y:y+h, x:x+w]
+                    face_roi = cv2.resize(face_roi, (100, 100))  # Normalize size
+                    
+                    name = os.path.splitext(filename)[0].replace("_", " ").title()
+                    self.known_faces[name] = face_roi
+                    self.known_names.append(name)
+                    print(f"  ✅ Loaded: {name}")
+                    
+                except Exception as e:
+                    print(f"  ❌ Failed to load {filename}: {e}")
+        
+        if self.known_faces:
+            self.is_active = True
+            print(f"✅ Facial Recognition Active: {len(self.known_names)} identities loaded.")
+
+    def identify(self, frame, bbox):
+        """
+        Identify a person within a bounding box using template matching.
+        bbox: [x1, y1, x2, y2]
+        """
+        if not self.is_active or not self.known_faces:
+            return "Unknown"
+
+        x1, y1, x2, y2 = bbox
+        
+        # Strategy 1: Crop Detection (Fast)
+        face_img = frame[y1:y2, x1:x2]
+        if face_img.size == 0: return "Unknown"
+        
+        gray_face = cv2.cvtColor(face_img, cv2.COLOR_BGR2GRAY)
+        faces = self.face_cascade.detectMultiScale(gray_face, 1.1, 4, minSize=(30, 30))
+        
+        target_face = None
+        
+        if len(faces) > 0:
+            (fx, fy, fw, fh) = faces[0]
+            target_face = gray_face[fy:fy+fh, fx:fx+fw]
+        else:
+            # Strategy 2: Full Frame Context (Slower but Robust)
+            gray_full = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            # Enhance contrast
+            gray_full = cv2.equalizeHist(gray_full)
+            
+            # Detect faces in the whole image
+            full_faces = self.face_cascade.detectMultiScale(gray_full, 1.1, 3, minSize=(20, 20))
+            
+            for (fx, fy, fw, fh) in full_faces:
+                # Check if face center is inside person bbox
+                cx = fx + fw // 2
+                cy = fy + fh // 2
+                
+                # Check with some margin (expand bbox by 10% for matching)
+                bx1, by1, bx2, by2 = x1 * 0.9, y1 * 0.9, x2 * 1.1, y2 * 1.1
+                
+                if bx1 < cx < bx2 and by1 < cy < by2:
+                    target_face = gray_full[fy:fy+fh, fx:fx+fw]
+                    print(f"✅ Found face in full frame context! ({fx},{fy})")
+                    break
+            
+            if target_face is None:
+                h, w, _ = frame.shape
+                print(f"⚠️ Face Rec: No face found (tried crop & full context) | Frame: {w}x{h}")
+                return "Unknown"
+        
+        # Resize to match known faces
+        face_roi = cv2.resize(target_face, (100, 100))
+        
+        # Template matching with all known faces
+        best_match = "Unknown"
+        best_score = -1.0 # Higher is better for TM_CCOEFF_NORMED
+        threshold = 0.5   # 0.5 is a reasonable starting point for faces
+        
+        for name, known_face in self.known_faces.items():
+            # Use Normalized Cross Correlation (robust to lighting)
+            # We need to ensure known_face is <= face_roi in size for matchTemplate?
+            # Actually matchTemplate expects the template to be smaller than the image.
+            # Here both are 100x100.
+            # So we can just use simple correlation or resize if needed.
+            # But if they are same size, result is 1x1.
+            
+            res = cv2.matchTemplate(face_roi, known_face, cv2.TM_CCOEFF_NORMED)
+            score = res[0][0]
+            
+            if score > best_score:
+                best_score = score
+                best_match = name
+        
+        # Debug Log for tuning
+        print(f"🔍 Face Check: Best Score: {best_score:.4f} | Match: {best_match} | Thresh: {threshold}")
+
+        # Only return match if confidence is high enough
+        if best_score > threshold:
+            return best_match
+        
+        return "Unknown"
+
+# ==============================================================================
+# ALPR (Automatic License Plate Recognition) SYSTEM
+# ==============================================================================
 
 class ALPRSystem:
     def __init__(self):
@@ -421,77 +568,4 @@ class ALPRSystem:
             return None
         except:
             return None
-
-
-    def _load_known_faces(self, directory):
-        if not os.path.exists(directory):
-            os.makedirs(directory, exist_ok=True)
-            print(f"📁 Created known_faces directory: {directory}")
-            return
-
-        print(f"bust👤 Loading Known Faces from {directory}...")
-        for filename in os.listdir(directory):
-            if filename.endswith((".jpg", ".png", ".jpeg")):
-                path = os.path.join(directory, filename)
-                try:
-                    image = face_recognition.load_image_file(path)
-                    encoding = face_recognition.face_encodings(image)[0]
-                    name = os.path.splitext(filename)[0].replace("_", " ").title()
-                    
-                    self.known_encodings.append(encoding)
-                    self.known_names.append(name)
-                    print(f"  - Loaded: {name}")
-                except Exception as e:
-                    print(f"  ❌ Failed to load {filename}: {e}")
-        
-        if self.known_encodings:
-            self.is_active = True
-            print(f"✅ Facial Recognition Active: {len(self.known_names)} identities loaded.")
-
-    def identify(self, frame, bbox):
-        """
-        Identify a person within a bounding box.
-        bbox: [x1, y1, x2, y2]
-        """
-        if not self.is_active:
-            return "Unknown"
-
-        x1, y1, x2, y2 = bbox
-        # Crop face (add margin?)
-        face_img = frame[y1:y2, x1:x2]
-        
-        # Convert to RGB (OpenCV is BGR)
-        rgb_face = cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB)
-        
-        try:
-            # Get encoding for the cropped face
-            # We assume the crop contains 1 face, so we can skip detection or use 'cnn'
-            # Using raw face_encodings on crop might be slow if we don't locate landmarks first
-            # Optimization: distinct face location is (0, width, height, 0) since we cropped it?
-            # Actually, face_recognition expects (top, right, bottom, left)
-            
-            h, w, _ = rgb_face.shape
-            if h < 20 or w < 20: return "Unknown" # Too small
-
-            encodings = face_recognition.face_encodings(rgb_face)
-            
-            if not encodings:
-                return "Unknown"
-            
-            # Compare with known faces
-            matches = face_recognition.compare_faces(self.known_encodings, encodings[0], tolerance=0.5)
-            name = "Unknown"
-
-            # Use the known face with the smallest distance to the new face
-            face_distances = face_recognition.face_distances(self.known_encodings, encodings[0])
-            best_match_index = np.argmin(face_distances)
-            
-            if matches[best_match_index]:
-                name = self.known_names[best_match_index]
-            
-            return name
-
-        except Exception as e:
-            # print(f"Face Rec Error: {e}")
-            return "Error"
 

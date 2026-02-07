@@ -83,7 +83,7 @@ export function SensorFusion({ data }: SensorFusionProps) {
                     )}
                 </div>
 
-                <div className="flex-1 min-h-[100px] w-full">
+                <div className="flex-1 min-h-[100px] w-full" style={{ minWidth: 0, minHeight: 0 }}>
                     <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={seismicData}>
                             <defs>

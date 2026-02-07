@@ -25,7 +25,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 
 const navItems = [
-  { href: "/", label: "🛡️ Autonomous Shield", icon: Shield },
+  { href: "/system", label: "🛡️ Autonomous Shield", icon: Shield },
   { href: "/analytics", label: "Neural Analytics", icon: Brain },
   { href: "/tactical", label: "Tactical 3D", icon: Layers3 },
   { href: "/map", label: "Map View", icon: Map },
