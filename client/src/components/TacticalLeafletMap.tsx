@@ -4,18 +4,14 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.heat';
 import { INDIA_GEOJSON, THERMAL_DATA } from '@/lib/geo-data';
-import { useDevices } from '@/hooks/use-devices';
+import { useDevices, useDrones } from '@/hooks/use-devices';
+import { socketClient } from '@/lib/socket';
 
 // --- Tactical Dark Mode Styles for Leaflet ---
 // We inject this style to invert the standard OSM tiles, creating a high-tech "Defense" look.
-const tacticalMapStyle = `
-  .leaflet-layer {
-    filter: grayscale(100%) invert(100%) contrast(1.2) brightness(0.8);
-  }
-  .range-rings {
-      animation: pulse 2s infinite;
-  }
-`;
+// --- Tactical Dark Mode Styles for Leaflet ---
+// We inject this style to invert the standard OSM tiles, creating a high-tech "Defense" look.
+// Styles moved to index.css (.tactical-map-layer)
 
 // Heatmap Component (must be child of MapContainer)
 function HeatmapLayer() {
@@ -24,8 +20,9 @@ function HeatmapLayer() {
     useEffect(() => {
         if (!map) return;
 
-        // @ts-ignore - leaflet.heat is a plugin
-        const heat = L.heatLayer(THERMAL_DATA, {
+        if (!map) return;
+
+        const heat = L.heatLayer(THERMAL_DATA as [number, number, number][], {
             radius: 25,
             blur: 15,
             maxZoom: 17,
@@ -100,7 +97,7 @@ function MeasureTool({ active }: { active: boolean | undefined }) {
             ))}
             {points.length === 2 && (
                 <Polyline positions={points} color="#3b82f6" dashArray="5, 10">
-                    <Popup isOpen={true} autoClose={false}>
+                    <Popup autoClose={false}>
                         DISTANCE: {(points[0].distanceTo(points[1])).toFixed(2)} M
                     </Popup>
                 </Polyline>
@@ -155,6 +152,71 @@ export function TacticalLeafletMap({ active, layers, focusTarget, routeData, cur
     zoomCmd?: { action: 'in' | 'out', ts: number } | null
 }) {
     const { data: devices } = useDevices();
+    const { data: drones } = useDrones();
+    const [realtimeDetections, setRealtimeDetections] = useState<any[]>([]);
+    const [hotspots, setHotspots] = useState<any[]>([]);
+    const [zones, setZones] = useState<any[]>([]);
+    const [dronePaths, setDronePaths] = useState<Record<string, [number, number][]>>({});
+
+    // Fetch Restricted Zones (PostGIS)
+    useEffect(() => {
+        if (!active) return;
+        fetch('/api/gis/zones')
+            .then(res => res.json())
+            .then(data => setZones(data))
+            .catch(err => console.error("Failed to load zones:", err));
+    }, [active]);
+
+    // Fetch Map Hotspots
+    useEffect(() => {
+        if (!active) return;
+        fetch('/api/map/hotspots')
+            .then(res => res.json())
+            .then(data => setHotspots(data))
+            .catch(err => console.error("Failed to load hotspots:", err));
+    }, [active]);
+
+    // Fetch Drone Paths
+    useEffect(() => {
+        if (!active || !drones) return;
+
+        const fetchPaths = async () => {
+            const newPaths: Record<string, [number, number][]> = {};
+            for (const drone of drones) {
+                try {
+                    const res = await fetch(`/api/drones/${drone.id}/path`);
+                    if (res.ok) {
+                        const pathData = await res.json();
+                        // Convert to [lat, lng]
+                        newPaths[drone.id] = pathData.map((p: any) => [p.lat, p.lng]);
+                    }
+                } catch (e) {
+                    console.error(`Failed to fetch path for ${drone.codeName}`, e);
+                }
+            }
+            setDronePaths(newPaths);
+        };
+
+        fetchPaths();
+        const interval = setInterval(fetchPaths, 10000);
+        return () => clearInterval(interval);
+    }, [active, drones]);
+
+    // Subscribe to Real-time WebSocket
+    useEffect(() => {
+        const unsubscribe = socketClient.subscribe((msg: any) => {
+            if (msg.type === 'NEW_DETECTION') {
+                console.log("Map received detection:", msg.data);
+                // Add to list, keep last 10
+                setRealtimeDetections(prev => {
+                    const exists = prev.find(d => d.id === msg.data.id);
+                    if (exists) return prev;
+                    return [msg.data, ...prev].slice(0, 10);
+                });
+            }
+        });
+        return unsubscribe;
+    }, []);
 
     // Fix for default Leaflet markers in React
     useEffect(() => {
@@ -171,9 +233,8 @@ export function TacticalLeafletMap({ active, layers, focusTarget, routeData, cur
 
     return (
         <div className="absolute inset-0 z-0 bg-black">
-            <style>{tacticalMapStyle}</style>
-
             <MapContainer
+                className="tactical-map-layer"
                 center={[20.5937, 78.9629]}
                 zoom={5}
                 style={{ height: '100%', width: '100%', background: '#0a0a0a' }}
@@ -203,9 +264,9 @@ export function TacticalLeafletMap({ active, layers, focusTarget, routeData, cur
                             layers: 'L3-INDIA', // LISS III Composite
                             format: 'image/jpeg',
                             transparent: true,
-                            version: '1.1.1',
-                            attribution: 'ISRO / NRSC Bhuvan'
+                            version: '1.1.1'
                         }}
+                        attribution='ISRO / NRSC Bhuvan'
                     />
                 )}
 
@@ -217,12 +278,41 @@ export function TacticalLeafletMap({ active, layers, focusTarget, routeData, cur
                         pathOptions={{
                             color: feature.properties.type === 'high-risk' ? '#ef4444' : '#f59e0b',
                             fillColor: feature.properties.type === 'high-risk' ? '#ef4444' : '#f59e0b',
-                            fillOpacity: 0.2,
-                            weight: 2,
+                            fillOpacity: 0.1,
+                            weight: 1,
                             dashArray: '5, 10'
                         }}
                     />
                 ))}
+
+                {/* 3.5. PostGIS Restricted Zones (Dynamic) */}
+                {zones.map((zone) => {
+                    if (!zone.area || !zone.area.coordinates) return null;
+                    // PostGIS GeoJSON coords are [lng, lat], Leaflet needs [lat, lng]
+                    const positions = zone.area.coordinates[0].map((c: number[]) => [c[1], c[0]]);
+                    const isRestricted = zone.zoneType === 'RESTRICTED';
+
+                    return (
+                        <Polygon
+                            key={`zone-${zone.id}`}
+                            positions={positions}
+                            pathOptions={{
+                                color: isRestricted ? '#dc2626' : '#ea580c',
+                                fillColor: isRestricted ? '#7f1d1d' : '#9a3412',
+                                fillOpacity: 0.3,
+                                weight: 2,
+                                className: isRestricted ? 'animate-pulse' : ''
+                            }}
+                        >
+                            <Popup className="tactical-popup">
+                                <div className="text-black font-mono text-xs p-1">
+                                    <strong className="text-red-700">{zone.name}</strong><br />
+                                    TYPE: {zone.zoneType}
+                                </div>
+                            </Popup>
+                        </Polygon>
+                    );
+                })}
 
                 {/* 4. Thermal / Heatmap Layer */}
                 {layers.heatmap && <HeatmapLayer />}
@@ -250,7 +340,112 @@ export function TacticalLeafletMap({ active, layers, focusTarget, routeData, cur
                     </Marker>
                 )}
 
-                {/* 7. Device Markers */}
+                {/* 7.1 Drone Breadcrumbs */}
+                {Object.entries(dronePaths).map(([id, path]) => (
+                    <Polyline
+                        key={`path-${id}`}
+                        positions={path}
+                        pathOptions={{ color: '#3b82f6', weight: 2, dashArray: '4, 4', opacity: 0.6 }}
+                    />
+                ))}
+
+                {/* 7. DRONES (New - from PostGIS) */}
+                {drones?.map((drone: any) => {
+                    const customIcon = L.divIcon({
+                        className: 'bg-transparent',
+                        html: `<div style="
+                            width: 16px; 
+                            height: 16px; 
+                            background-color: ${drone.status === 'IDLE' ? '#22c55e' : '#eab308'}; 
+                            border-radius: 0%; 
+                            transform: rotate(45deg);
+                            border: 2px solid white;
+                            box-shadow: 0 0 15px ${drone.status === 'IDLE' ? '#22c55e' : '#eab308'};
+                        "></div>`
+                    });
+
+                    return (
+                        <Marker
+                            key={drone.id}
+                            position={[drone.lat, drone.lng]}
+                            icon={customIcon}
+                        >
+                            <Popup className="tactical-popup">
+                                <div className="text-black font-mono text-xs p-1">
+                                    <strong>{drone.codeName}</strong><br />
+                                    TYPE: {drone.type}<br />
+                                    BAT: {drone.batteryLevel}%
+                                </div>
+                            </Popup>
+                        </Marker>
+                    )
+                })}
+
+                {/* 7.5. INTEL HOTSPOTS (From Backend) */}
+                {hotspots.map((spot) => {
+                    const color = spot.severity === 'HIGH' ? '#ef4444' : '#eab308';
+                    const icon = L.divIcon({
+                        className: 'bg-transparent',
+                        html: `<div style="
+                            width: 0; 
+                            height: 0; 
+                            border-left: 8px solid transparent;
+                            border-right: 8px solid transparent;
+                            border-bottom: 16px solid ${color};
+                            filter: drop-shadow(0 0 4px ${color});
+                            animation: bounce 2s infinite;
+                        "></div>`
+                    });
+
+                    return (
+                        <Marker key={`hotspot-${spot.id}`} position={[spot.lat, spot.lng]} icon={icon}>
+                            <Popup className="tactical-popup">
+                                <div className="text-black font-mono text-xs p-1">
+                                    <strong style={{ color }}>{spot.severity} INTEL</strong><br />
+                                    {spot.title}
+                                </div>
+                            </Popup>
+                        </Marker>
+                    );
+                })}
+
+                {/* 8. REAL-TIME DETECTIONS (High Confidence) */}
+                {realtimeDetections.map((detection) => {
+                    if (!detection.location || !detection.location.coordinates) return null;
+                    const logLat = detection.location.coordinates[1];
+                    const logLng = detection.location.coordinates[0];
+
+                    const alertIcon = L.divIcon({
+                        className: 'bg-transparent',
+                        html: `<div style="
+                            width: 20px; 
+                            height: 20px; 
+                            background-color: #ef4444; 
+                            border-radius: 50%; 
+                            border: 2px solid white;
+                            box-shadow: 0 0 20px #ef4444; 
+                            animation: pulse 0.5s infinite;
+                        "></div>`
+                    });
+
+                    return (
+                        <Marker
+                            key={detection.id}
+                            position={[logLat, logLng]}
+                            icon={alertIcon}
+                        >
+                            <Popup className="tactical-popup">
+                                <div className="text-black font-mono text-xs p-1">
+                                    <strong className="text-red-600">THREAT DETECTED</strong><br />
+                                    OBJ: {detection.detected_object}<br />
+                                    CONF: {detection.confidence}%
+                                </div>
+                            </Popup>
+                        </Marker>
+                    )
+                })}
+
+                {/* 7. Device Markers (Legacy) */}
                 {devices?.map((device) => {
                     // Map Backend 'x/y' (which were 2500, etc) to Real Lat/Lng
                     // In a real system, DB would store lat/lng directly. 

@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  # The Database: PostGIS + PostgreSQL
+  shield-db:
+    image: postgis/postgis:15-3.3
+    container_name: shield_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: autonomous_shield
+    ports:
+      - "5432:5432"
+    volumes:
+      - shield_data:/var/lib/postgresql/data
+      # Automatically run our initial SQL (Roles, Extensions) on startup
+      - ./init-db:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # The Backend: Node.js + Drizzle
+  shield-api:
+    build: .
+    container_name: shield_api
+    depends_on:
+      shield-db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@shield-db:5432/autonomous_shield
+      PORT: 3000
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+
+  # The AI Service: Python + YOLO
+  shield-ai:
+    build: ./ai-service
+    container_name: shield_ai
+    depends_on:
+      shield-db:
+        condition: service_healthy
+    environment:
+      DB_HOST: shield-db
+      DB_PORT: 5432
+      DB_NAME: autonomous_shield
+      DB_USER: ${DB_USER:-postgres}
+    ports:
+      - "8000:8000"
+    restart: always
+
+volumes:
+  shield_data:

@@ -44,12 +44,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+import os
+
 # ==============================================================================
 # CONFIGURATION
 # ==============================================================================
 # Use 0 for webcam, or HTTP URL for IP Camera
-VIDEO_SOURCE = "http://192.168.1.8:8080/video"
-# VIDEO_SOURCE = 0
+# Defaults to 0 (Webcam) if not set
+env_source = os.getenv("VIDEO_SOURCE", "0")
+try:
+    # Convert to int if it's a number (for webcam index)
+    VIDEO_SOURCE = int(env_source)
+except ValueError:
+    VIDEO_SOURCE = env_source
 
 # Global instances
 detector = MockDetector(frame_width=1280, frame_height=720)
@@ -127,7 +134,7 @@ from sqlalchemy import select
 async def startup():
     # Initialize Database
     await init_db()
-    print("💾 Database Initialized")
+    print("Database Initialized")
 
     global vision_engine, using_real_vision, model_manager
     
@@ -429,12 +436,12 @@ async def get_statistics():
 
 if __name__ == "__main__":
     print("\n" + "="*60)
-    print("🛡️  AUTONOMOUS SHIELD AI SERVICE")
+    print("  AUTONOMOUS SHIELD AI SERVICE")
     print("="*60)
-    print("🚀 Starting FastAPI server...")
-    print("📡 WebSocket: ws://localhost:8000/api/ai/stream")
-    print("🌐 REST API:  http://localhost:8000/api/ai/detect")
-    print("📊 Status:    http://localhost:8000/api/ai/status")
+    print("  Starting FastAPI server...")
+    print("  WebSocket: ws://localhost:8000/api/ai/stream")
+    print("  REST API:  http://localhost:8000/api/ai/detect")
+    print("  Status:    http://localhost:8000/api/ai/status")
     print("="*60 + "\n")
     
     uvicorn.run(

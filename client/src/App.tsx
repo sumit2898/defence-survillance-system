@@ -46,7 +46,7 @@ function Router() {
           <Route path="/map" component={MapView} />
 
           {/* Classic Monitoring */}
-          {/* <Route path="/dashboard" component={Dashboard} /> */}
+          <Route path="/dashboard" component={Dashboard} />
           <Route path="/monitoring" component={Monitoring} />
           <Route path="/playback" component={Playback} />
           <Route path="/alerts" component={Alerts} />

@@ -26,6 +26,12 @@ Transform your surveillance from passive recording to active threat detection wi
 
 ---
 
+## 🚀 Production Capability
+-   **Full Flex Web**: Responsive dashboard optimized for all screen sizes (mobile/desktop).
+-   **Security**: Hardened with Helmet headers and database auditing.
+-   **Deployment**: Docker-ready with `0.0.0.0` binding and optimized ESM builds.
+-   **Geo-Spatial**: PostGIS integration for advanced threat mapping.
+
 ## 🚀 Quick Start
 
 ### 1. Start the AI Service
@@ -45,11 +51,11 @@ npm install
 npm run dev
 ```
 
-The dashboard will open at **http://localhost:5000**
+The dashboard will open at **http://localhost:3000**
 
 ### 3. Access the System
 
-Navigate to **http://localhost:5000** (automatically loads Autonomous Shield)
+Navigate to **http://localhost:3000** (automatically loads Autonomous Shield)
 
 ---
 
@@ -272,39 +278,37 @@ detector = MockDetector(
 
 ## 🐳 Deployment
 
-### Docker Compose (Recommended)
+### Docker Compose (Production Ready)
 
 ```yaml
 version: '3.8'
 
 services:
-  ai-service:
-    build: ./ai-service
-    ports:
-      - "8000:8000"
-    restart: unless-stopped
+  # PostGIS Database
+  shield-db:
+    image: postgis/postgis:15-3.3
+    ports: ["5432:5432"]
+    volumes:
+      - ./init-db:/docker-entrypoint-initdb.d/
 
-  frontend:
-    build: ./client
-    ports:
-      - "5000:5000"
-    depends_on:
-      - ai-service
-    restart: unless-stopped
+  # Node.js API
+  shield-api:
+    build: .
+    ports: ["3000:3000"]
+    depends_on: [shield-db]
+
+  # Python AI Service
+  shield-ai:
+    build: ./ai-service
+    depends_on: [shield-db]
 ```
 
 Run:
 ```bash
-docker-compose up -d
+docker-compose up --build
 ```
 
-### Edge Deployment (Jetson Nano)
-
-1. Install NVIDIA JetPack
-2. Install Python 3.8+
-3. Install YOLOv8 with TensorRT optimization
-4. Deploy AI service locally
-5. Connect cameras via RTSP
+**Note:** The system will automatically initialize PostGIS extensions on the first run.
 
 ---
 

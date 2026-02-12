@@ -3,9 +3,15 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import helmet from "helmet";
+import compression from "compression";
 
 const app = express();
 const httpServer = createServer(app);
+
+console.log("🚀 Server Starting...");
+console.log("Environment:", process.env.NODE_ENV);
+console.log("Current Directory:", process.cwd());
 
 declare module "http" {
   interface IncomingMessage {
@@ -22,6 +28,12 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+
+// Security & Performance
+app.use(helmet({
+  contentSecurityPolicy: false, // Disabled for development/flexibility with external sources
+}));
+app.use(compression());
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -60,8 +72,29 @@ app.use((req, res, next) => {
   next();
 });
 
+
 (async () => {
+  const { setupWebSocket } = await import("./websocket");
+  setupWebSocket(httpServer);
+
   await registerRoutes(httpServer, app);
+
+
+
+  // importantly only setup vite in development and after
+  // setting up all the other routes so the catch-all route
+  // doesn't interfere with the other routes
+  const isProduction = process.env.NODE_ENV === "production" || process.env.NODE_ENV === undefined;
+  console.log("Checking Environment Logic...", { isProduction, env: process.env.NODE_ENV });
+
+  if (isProduction) {
+    console.log("✅ Entering Production Mode (Default)");
+    serveStatic(app);
+  } else {
+    console.log("⚠️ Entering Development Mode - Attempting SetupVite");
+    const { setupVite } = await import("./vite");
+    await setupVite(httpServer, app);
+  }
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
@@ -76,16 +109,6 @@ app.use((req, res, next) => {
     return res.status(status).json({ message });
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (process.env.NODE_ENV === "production") {
-    serveStatic(app);
-  } else {
-    const { setupVite } = await import("./vite");
-    await setupVite(httpServer, app);
-  }
-
   // ALWAYS serve the app on the port specified in the environment variable PORT
   // Other ports are firewalled. Default to 5000 if not specified.
   // this serves both the API and the client.
@@ -94,10 +117,21 @@ app.use((req, res, next) => {
   httpServer.listen(
     {
       port,
-      host: "127.0.0.1",
+      host: "0.0.0.0",
     },
     () => {
       log(`serving on port ${port}`);
     },
   );
+  // Refresh Dashboard Stats every 5 minutes
+  setInterval(async () => {
+    try {
+      const { refreshDashboardStats } = await import("./storage");
+      await refreshDashboardStats();
+      log("Dashboard stats refreshed");
+    } catch (e) {
+      console.error("Failed to auto-refresh dashboard stats:", e);
+    }
+  }, 5 * 60 * 1000);
+
 })();

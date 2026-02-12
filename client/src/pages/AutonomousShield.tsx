@@ -108,7 +108,7 @@ export default function AutonomousShield() {
     useEffect(() => {
         // Connect to AI service WebSocket
         const connectWebSocket = () => {
-            const ws = new WebSocket('ws://localhost:8000/api/ai/stream');
+            const ws = new WebSocket(`ws://${window.location.hostname}:8000/api/ai/stream`);
 
             ws.onopen = () => {
                 console.log('🛡️ Connected to Autonomous Shield AI');
@@ -137,6 +137,22 @@ export default function AutonomousShield() {
 
                 if (data.type === 'critical_alert') {
                     setAlerts(prev => [data.alert, ...prev].slice(0, 50)); // Keep last 50 alerts
+                }
+
+                if (data.type === 'SYSTEM_EVENT') {
+                    const event = data.data;
+                    const newAlert: Alert = {
+                        alert_id: `evt-${Date.now()}`,
+                        type: event.eventType,
+                        object: event.metadata?.drone || 'UNKNOWN',
+                        confidence: '100%',
+                        location: event.title,
+                        coordinates: event.metadata?.coords || { lat: 0, lng: 0 },
+                        description: event.title,
+                        timestamp: event.timestamp || new Date().toISOString(),
+                        requires_action: event.severity === 'CRITICAL'
+                    };
+                    setAlerts(prev => [newAlert, ...prev].slice(0, 50));
                 }
             };
 
@@ -240,7 +256,7 @@ export default function AutonomousShield() {
                 <div className="flex-1 flex flex-col relative z-10 text-white">
 
                     {/* Mission Control Matrix */}
-                    <div className="px-6 pt-6 pb-2 grid grid-cols-5 gap-4">
+                    <div className="px-6 pt-6 pb-2 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                         {/* 1. Tactical */}
                         <motion.div
                             whileHover={{ y: -2, scale: 1.02 }}
@@ -351,9 +367,9 @@ export default function AutonomousShield() {
                         </motion.div>
                     </div>
                     {/* Top Section - Dashboard Grid */}
-                    <div className="flex-1 grid grid-cols-12 gap-4 p-4">
+                    <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 p-4">
                         {/* Left Sidebar - System Vitals & Widgets */}
-                        <div className="col-span-3 space-y-4">
+                        <div className="col-span-1 lg:col-span-3 space-y-4">
                             {/* Security Score Widget */}
                             <SecurityScore score={securityScore} className="w-full" />
 
@@ -470,7 +486,7 @@ export default function AutonomousShield() {
                         </div>
 
                         {/* Center - Live Feed + Map Split */}
-                        <div className="col-span-6 flex flex-col gap-4 h-full">
+                        <div className="col-span-1 lg:col-span-6 flex flex-col gap-4 h-full">
 
                             {/* TOP: Visual Cortex (Live Feed) - 60% Height */}
                             <div className="flex-[3] relative bg-black/40 border border-white/10 rounded-2xl overflow-hidden backdrop-blur-md group">
@@ -511,7 +527,7 @@ export default function AutonomousShield() {
                             </div>
 
                             {/* MODULE SHOWCASE: Command Capabilities */}
-                            <div className="h-48 grid grid-cols-4 gap-4">
+                            <div className="h-48 grid grid-cols-2 lg:grid-cols-4 gap-4">
                                 {/* Neural Analytics Card */}
                                 <div className="group relative bg-black/40 border border-white/10 rounded-xl p-4 overflow-hidden hover:border-purple-500/50 transition-all cursor-pointer">
                                     <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -574,7 +590,7 @@ export default function AutonomousShield() {
                             </div>
 
                         </div>
-                        <div className="col-span-3 flex flex-col gap-4">
+                        <div className="col-span-1 lg:col-span-3 flex flex-col gap-4">
                             {/* Active Units List */}
                             <div className="bg-black/40 border border-white/10 rounded-xl p-4 backdrop-blur-md">
                                 <div className="flex items-center gap-2 mb-3 border-b border-white/10 pb-2">

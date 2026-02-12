@@ -1,4 +1,126 @@
 import { z } from "zod";
+import { sql } from 'drizzle-orm';
+import {
+  pgTable,
+  uuid,
+  text,
+  varchar,
+  integer,
+  real,
+  timestamp,
+  boolean,
+  jsonb,
+  customType,
+  pgRole,
+  pgPolicy
+} from 'drizzle-orm/pg-core';
+
+// Custom type for PostGIS Geography Point
+const geographyPoint = customType<{ data: { lng: number; lat: number } }>({
+  dataType() {
+    return 'jsonb';
+  },
+});
+
+// 1. DRONES TABLE
+export const drones = pgTable('drones', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  codeName: varchar('code_name', { length: 50 }).notNull(),
+  type: varchar('type', { length: 20 }).notNull(), // SCOUT, INTERCEPTOR
+  status: varchar('status', { length: 20 }).default('IDLE'),
+  batteryLevel: integer('battery_level').default(100),
+  location: geographyPoint('last_known_location'),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const dronePaths = pgTable('drone_paths', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  droneId: uuid('drone_id').references(() => drones.id).notNull(),
+  lat: real('lat').notNull(),
+  lng: real('lng').notNull(),
+  timestamp: timestamp('timestamp').defaultNow(),
+});
+
+// 2. AI DETECTIONS (The Neural Core)
+export const aiDetections = pgTable('ai_detections', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  droneId: uuid('drone_id').references(() => drones.id),
+  detectedObject: varchar('detected_object', { length: 100 }).notNull(), // 'human', 'vehicle'
+  confidence: integer('confidence'), // 0-100
+  boundingBox: jsonb('bounding_box'), // { x, y, w, h }
+  detectedAt: timestamp('detected_at').defaultNow(),
+});
+
+// 3. SYSTEM EVENTS (The Activity Feed)
+export const systemEvents = pgTable('system_events', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  eventType: varchar('event_type', { length: 50 }).notNull(), // 'DRONE_LAUNCH'
+  severity: varchar('severity', { length: 20 }).default('INFO'),
+  metadata: jsonb('metadata'), // Extra flexible data
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// Custom type for PostGIS Geography Polygon
+const geographyPolygon = customType<{ data: string }>({
+  dataType() {
+    return 'jsonb';
+  },
+});
+
+// 4. SURVEILLANCE ZONES
+export const surveillanceZones = pgTable('surveillance_zones', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: varchar('name', { length: 100 }).notNull(),
+  zoneType: varchar('zone_type', { length: 20 }).notNull(), // 'RESTRICTED', 'BASE', 'BORDER'
+  area: geographyPolygon('area').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// 5. INTEL HOTSPOTS
+export const intelHotspots = pgTable('intel_hotspots', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  title: varchar('title', { length: 100 }).notNull(),
+  location: geographyPoint('location').notNull(),
+  severity: varchar('severity', { length: 20 }), // 'LOW', 'MEDIUM', 'HIGH'
+  isActive: boolean('is_active').default(true),
+});
+
+// 6. THREAT ASSESSMENTS (RLS Protected)
+// Define our Roles
+export const analystRole = pgRole('analyst');
+export const commanderRole = pgRole('commander');
+
+export const threatAssessments = pgTable('threat_assessments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  threatLevel: varchar('threat_level', { length: 50 }), // 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'
+  decision: text('decision'),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => [
+  // POLICY: Analysts can only see threats up to 'HIGH'. 
+  // 'CRITICAL' threats are for Commanders only.
+  pgPolicy('analyst_view_limit', {
+    for: 'select',
+    to: analystRole,
+    using: sql`${table.threatLevel} != 'CRITICAL'`,
+  }),
+  // POLICY: Commanders see everything
+  pgPolicy('commander_full_access', {
+    for: 'select',
+    to: commanderRole,
+    using: sql`true`,
+  }),
+]);
+
+// 7. AUDIT LOGS (Non-Repudiation)
+export const auditLogs = pgTable('audit_logs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tableName: varchar('table_name', { length: 50 }).notNull(),
+  action: varchar('action', { length: 20 }).notNull(), // INSERT, UPDATE, DELETE
+  oldData: jsonb('old_data'),
+  newData: jsonb('new_data'),
+  changedBy: uuid('changed_by'), // Intended to be set via current_setting('app.current_user_id')
+  createdAt: timestamp('created_at').defaultNow(),
+});
 
 // === DOMAIN TYPES ===
 
@@ -60,6 +182,13 @@ export const insertLogSchema = z.object({
   // id and timestamp are DB generated
 });
 
+export const insertDronePathSchema = z.object({
+  droneId: z.string(), // uuid
+  lat: z.number(),
+  lng: z.number(),
+  timestamp: z.date().optional(), // Or allow string input if dates need parsing
+});
+
 // === TYPES ===
 
 export type InsertAlert = z.infer<typeof insertAlertSchema>;
@@ -73,3 +202,6 @@ export type Incident = InsertIncident & { id: number; createdAt: Date | string; 
 
 export type InsertLog = z.infer<typeof insertLogSchema>;
 export type Log = InsertLog & { id: number; timestamp: Date | string };
+
+export type InsertDronePath = z.infer<typeof insertDronePathSchema>;
+export type DronePath = InsertDronePath & { id: string; timestamp: Date | string };

@@ -19,12 +19,12 @@ export function LiveFeed({ isActive, detections, processingStats }: LiveFeedProp
     }, [isActive]);
 
     return (
-        <div className="relative w-full h-full bg-black overflow-hidden">
+        <div className="relative w-full aspect-video bg-black overflow-hidden rounded-lg">
             {/* Simulated Video Feed (or Real Video Element) */}
             {/* Live MJPEG Stream or Simulation */}
             {isActive ? (
                 <img
-                    src="http://localhost:8000/api/ai/video_feed"
+                    src={`http://${window.location.hostname}:8000/api/ai/video_feed`}
                     className="w-full h-full object-cover opacity-80"
                     alt="Live Neural Feed"
                 />

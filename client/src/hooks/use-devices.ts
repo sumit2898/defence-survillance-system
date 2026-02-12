@@ -25,3 +25,15 @@ export function useDevice(id: number) {
     },
   });
 }
+
+export function useDrones() {
+  return useQuery({
+    queryKey: ["/api/drones"],
+    queryFn: async () => {
+      const res = await fetch("/api/drones");
+      if (!res.ok) throw new Error("Failed to fetch drones");
+      return await res.json();
+    },
+    refetchInterval: 2000,
+  });
+}

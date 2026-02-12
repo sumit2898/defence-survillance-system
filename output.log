@@ -1,0 +1,27 @@
+🚀 Server Starting...
+Environment: production
+Current Directory: C:\defence-survillance-system
+WS Listener connecting to: postgresql://postgres:****@localhost:5000/mydb
+Setting up Postgres Listener on channel 'high_threat_alert'...
+Checking Environment Logic... { isProduction: true, env: 'production' }
+✅ Entering Production Mode (Default)
+📂 Serving static files from: C:\defence-survillance-system\dist\public
+C:\defence-survillance-system\node_modules\path-to-regexp\dist\index.js:96
+            throw new PathError(`Missing parameter name at index ${index}`, str);
+                  ^
+
+PathError [TypeError]: Missing parameter name at index 1: *; visit https://git.new/pathToRegexpError for info
+    at name (C:\defence-survillance-system\node_modules\path-to-regexp\dist\index.js:96:19)
+    at parse (C:\defence-survillance-system\node_modules\path-to-regexp\dist\index.js:113:68)
+    at pathToRegexp (C:\defence-survillance-system\node_modules\path-to-regexp\dist\index.js:267:58)
+    at Object.match (C:\defence-survillance-system\node_modules\path-to-regexp\dist\index.js:237:30)
+    at matcher (C:\defence-survillance-system\node_modules\router\lib\layer.js:86:23)
+    at new Layer (C:\defence-survillance-system\node_modules\router\lib\layer.js:93:62)
+    at router.use (C:\defence-survillance-system\node_modules\router\index.js:398:19)
+    at app.<anonymous> (C:\defence-survillance-system\node_modules\express\lib\application.js:222:21)
+    at Array.forEach (<anonymous>)
+    at app.use (C:\defence-survillance-system\node_modules\express\lib\application.js:219:7) {
+  originalPath: '*'
+}
+
+Node.js v24.10.0

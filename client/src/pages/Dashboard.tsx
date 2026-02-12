@@ -24,6 +24,15 @@ import { BootScreen } from "@/components/BootScreen";
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { SecurityAuditLog } from "@/components/SecurityAuditLog";
+import { ThreatCommand } from "@/components/ThreatCommand";
+import { Layout } from "@/components/Layout";
+import { FeedPlayer } from "@/components/FeedPlayer";
+import { NetworkTraffic } from "@/components/NetworkTraffic";
+import { SecurityScore } from "@/components/SecurityScore";
+import { TelemetryCard } from "@/components/TelemetryCard";
+import { useAlerts } from "@/hooks/use-alerts";
+import { useDevices } from "@/hooks/use-devices";
 
 // Generate realistic activity data with smooth trends
 const mockActivityData = Array.from({ length: 24 }, (_, i) => {
@@ -730,7 +739,7 @@ export default function Dashboard() {
         </motion.div >
 
         {/* SECTION 4: Threat Log Terminal */}
-        < motion.div
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-100px" }}
@@ -753,104 +762,46 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* Long Scrolling Log Console */}
-            <div className="lg:col-span-8 bg-zinc-950 border border-white/5 rounded-3xl overflow-hidden shadow-2xl flex flex-col relative min-h-[500px] hover:border-white/20 transition-all duration-300">
-              <div className="p-5 border-b border-white/5 bg-white/[0.02] flex items-center justify-between sticky top-0 bg-zinc-950/80 backdrop-blur-md z-20">
-                <div className="flex items-center gap-4">
-                  <div className="flex gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444]" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
-                  </div>
-                  <span className="text-[10px] text-zinc-500 uppercase font-black tracking-[0.3em]">ROOT_AUDIT_STREAM</span>
-                </div>
-                <div className="flex gap-4">
-                  <span className="text-[8px] font-mono text-zinc-500 uppercase">Buffer_nominal: 100%</span>
-                  <div className="w-[1px] h-4 bg-white/10" />
-                  <button className="text-[10px] font-black text-white/40 hover:text-white transition-colors uppercase tracking-widest">Clear_Terminal</button>
-                </div>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-8 font-mono text-xs custom-scrollbar space-y-3">
-                {logs?.map((log, i) => (
-                  <div key={i} className="flex gap-6 group/log py-2 hover:bg-white/5 px-4 rounded-xl transition-all border border-transparent hover:border-white/5">
-                    <span className="text-zinc-600 shrink-0 font-bold uppercase tracking-tighter">[{format(new Date(log.timestamp), 'HH:mm:ss:SSS')}]</span>
-                    <div className="flex items-start gap-4 flex-1">
-                      <span className={cn(
-                        "px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest min-w-[80px] text-center",
-                        log.level === 'error' ? "bg-red-500 text-white" :
-                          log.level === 'warning' ? "bg-yellow-500 text-black" : "bg-green-500 text-white"
-                      )}>
-                        {log.level}
-                      </span>
-                      <div className="flex-1">
-                        <span className="text-white font-black uppercase text-[11px] mr-3">{log.action}:</span>
-                        <span className="text-zinc-400 leading-relaxed text-[11px]">{log.details}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                <div className="flex items-center gap-2 text-green-500 animate-pulse mt-4 px-4">
-                  <span className="text-sm">_</span>
-                  <span className="text-[10px] font-black uppercase tracking-[0.4em]">SYSTEM_AWAITING_INPUT...</span>
-                </div>
-              </div>
-            </div>
-
-            {/* High Priority Alerts Panel */}
-            <div className="lg:col-span-4 bg-black/60 backdrop-blur-xl border border-white/10 rounded-3xl flex flex-col overflow-hidden shadow-2xl hover:border-white/20 transition-all duration-300">
-              <div className="p-6 border-b border-white/10 bg-red-500/[0.05] relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 to-transparent animate-pulse" />
-                <h3 className="text-[10px] font-black uppercase tracking-[0.3em] flex items-center gap-4 text-red-500 relative z-10">
-                  <div className="p-2 bg-red-500/20 rounded-lg">
-                    <AlertTriangle className="h-4 w-4" />
-                  </div>
-                  CRITICAL_OVERRIDE
-                </h3>
-                <span className="absolute top-8 right-6 z-10 text-[10px] font-black bg-red-500 text-white px-3 py-1 rounded-full shadow-[0_0_20px_rgba(239,68,68,0.4)]">
-                  {activeAlerts} ACTIVE_NODES
-                </span>
-              </div>
-              <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
-                {alerts?.filter(a => a.status === 'active').map((alert, i) => (
-                  <motion.div
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.1 }}
-                    key={alert.id}
-                    className="p-5 border border-red-500/30 bg-red-500/[0.03] rounded-2xl hover:bg-red-500/[0.08] transition-all group relative overflow-hidden"
-                  >
-                    <div className="absolute top-0 left-0 w-1.5 h-full bg-red-500 shadow-[0_0_15px_#ef4444]" />
-                    <div className="flex justify-between items-start mb-3">
-                      <h4 className="text-xs font-black text-red-500 uppercase tracking-tight">{alert.title}</h4>
-                      <span className="text-[9px] font-mono text-zinc-600 bg-black/40 px-2 py-0.5 rounded border border-white/5">PRI_01</span>
-                    </div>
-                    <p className="text-[11px] text-zinc-400 font-medium leading-relaxed mb-4">{alert.description}</p>
-                    <div className="flex justify-between items-center text-[9px] text-zinc-500 uppercase font-black tracking-widest font-mono border-t border-white/5 pt-3">
-                      <span className="flex items-center gap-1.5"><MapPin className="h-3 w-3" />{alert.location}</span>
-                      <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" />{format(new Date(alert.timestamp), 'HH:mm:ss')}</span>
-                    </div>
-                  </motion.div>
-                ))}
-                {!activeAlerts && (
-                  <div className="h-full flex flex-col items-center justify-center text-zinc-800 p-10 text-center grayscale opacity-30">
-                    <Shield className="h-24 w-24 mb-6 stroke-1" />
-                    <p className="font-black text-[10px] uppercase tracking-[0.5em]">SYSTEM_STABLE_ALL_SECTORS_NOMINAL</p>
-                  </div>
-                )}
-              </div>
+            {/* Live Audit Log */}
+            <div className="lg:col-span-12 bg-zinc-950 border border-white/5 rounded-3xl overflow-hidden shadow-2xl flex flex-col relative min-h-[500px] hover:border-white/20 transition-all duration-300">
+              <SecurityAuditLog className="p-6 h-full" />
             </div>
           </div>
-        </motion.div >
-      </div >
+        </motion.div>
+
+        {/* SECTION 5: Command Authorization */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ duration: 0.6, delay: 0.4 }}
+          id="section-command"
+          className="scroll-mt-32 space-y-4"
+        >
+          <div className="flex items-center gap-4 mb-6 px-2">
+            <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center shadow-lg shadow-cyan-500/5">
+              <Lock className="h-6 w-6 text-cyan-500" />
+            </div>
+            <div>
+              <span className="text-[10px] font-black text-cyan-500/60 uppercase tracking-[0.2em] block mb-1">SECTION_05</span>
+              <span className="text-xl font-black text-white uppercase tracking-widest leading-none">COMMAND_AUTHORIZATION</span>
+            </div>
+            <div className="flex-1 h-px bg-white/5" />
+          </div>
+
+          <div className="grid grid-cols-1 gap-8">
+            <ThreatCommand />
+          </div>
+        </motion.div>
+      </div>
 
       {/* Floating Section Navigator */}
-      < div className="fixed right-8 top-1/2 -translate-y-1/2 z-40 hidden xl:flex flex-col gap-8 items-center bg-black/40 backdrop-blur-md p-3 rounded-full border border-white/5 shadow-2xl" >
+      <div className="fixed right-8 top-1/2 -translate-y-1/2 z-40 hidden xl:flex flex-col gap-8 items-center bg-black/40 backdrop-blur-md p-3 rounded-full border border-white/5 shadow-2xl">
         {
           ['summary', 'map', 'feeds', 'logs'].map((section, i) => (
             <motion.a
               key={section}
-              href={`#section - ${section} `}
+              href={`#section-${section}`}
               whileHover={{ scale: 1.2, x: -4 }}
               className="group relative"
             >
@@ -863,7 +814,7 @@ export default function Dashboard() {
             </motion.a>
           ))
         }
-      </div >
+      </div>
     </Layout >
   );
 }
