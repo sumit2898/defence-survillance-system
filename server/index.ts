@@ -73,65 +73,70 @@ app.use((req, res, next) => {
 });
 
 
-(async () => {
-  const { setupWebSocket } = await import("./websocket");
-  setupWebSocket(httpServer);
 
-  await registerRoutes(httpServer, app);
+// Export the app for Vercel
+export default app;
 
+if (process.env.NODE_ENV !== "test" && !process.env.VERCEL) {
+  (async () => {
+    const { setupWebSocket } = await import("./websocket");
+    setupWebSocket(httpServer);
 
+    await registerRoutes(httpServer, app);
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  const isProduction = process.env.NODE_ENV === "production" || process.env.NODE_ENV === undefined;
-  console.log("Checking Environment Logic...", { isProduction, env: process.env.NODE_ENV });
+    // importantly only setup vite in development and after
+    // setting up all the other routes so the catch-all route
+    // doesn't interfere with the other routes
+    const isProduction = process.env.NODE_ENV === "production" || process.env.NODE_ENV === undefined;
+    console.log("Checking Environment Logic...", { isProduction, env: process.env.NODE_ENV });
 
-  if (isProduction) {
-    console.log("✅ Entering Production Mode (Default)");
-    serveStatic(app);
-  } else {
-    console.log("⚠️ Entering Development Mode - Attempting SetupVite");
-    const { setupVite } = await import("./vite");
-    await setupVite(httpServer, app);
-  }
-
-  app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    console.error("Internal Server Error:", err);
-
-    if (res.headersSent) {
-      return next(err);
+    if (isProduction) {
+      console.log("✅ Entering Production Mode (Default)");
+      serveStatic(app);
+    } else {
+      console.log("⚠️ Entering Development Mode - Attempting SetupVite");
+      const { setupVite } = await import("./vite");
+      await setupVite(httpServer, app);
     }
 
-    return res.status(status).json({ message });
-  });
+    // Error handling middleware
+    app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || "5000", 10);
-  httpServer.listen(
-    {
-      port,
-      host: "0.0.0.0",
-    },
-    () => {
-      log(`serving on port ${port}`);
-    },
-  );
-  // Refresh Dashboard Stats every 5 minutes
-  setInterval(async () => {
-    try {
-      const { refreshDashboardStats } = await import("./storage");
-      await refreshDashboardStats();
-      log("Dashboard stats refreshed");
-    } catch (e) {
-      console.error("Failed to auto-refresh dashboard stats:", e);
-    }
-  }, 5 * 60 * 1000);
+      console.error("Internal Server Error:", err);
 
-})();
+      if (res.headersSent) {
+        return next(err);
+      }
+
+      return res.status(status).json({ message });
+    });
+
+    // ALWAYS serve the app on the port specified in the environment variable PORT
+    // Other ports are firewalled. Default to 5000 if not specified.
+    // this serves both the API and the client.
+    // It is the only port that is not firewalled.
+    const port = parseInt(process.env.PORT || "5000", 10);
+    httpServer.listen(
+      {
+        port,
+        host: "0.0.0.0",
+      },
+      () => {
+        log(`serving on port ${port}`);
+      },
+    );
+    // Refresh Dashboard Stats every 5 minutes
+    setInterval(async () => {
+      try {
+        const { refreshDashboardStats } = await import("./storage");
+        await refreshDashboardStats();
+        log("Dashboard stats refreshed");
+      } catch (e) {
+        console.error("Failed to auto-refresh dashboard stats:", e);
+      }
+    }, 5 * 60 * 1000);
+
+  })();
+}
