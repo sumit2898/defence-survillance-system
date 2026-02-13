@@ -12,6 +12,7 @@ interface Detection {
         width: number;
         height: number;
     };
+    bbox_normalized?: number[];
     threat_level: 'normal' | 'suspicious' | 'critical';
     timestamp: string;
 }
@@ -34,20 +35,11 @@ export function AIDetectionOverlay({ detections, isConnected }: AIDetectionOverl
     };
 
     const getTextColor = (level: string) => {
-        switch (level) {
-            case 'critical':
-                return 'text-red-400';
-            case 'suspicious':
-                return 'text-yellow-400';
-            default:
-                return 'text-green-400';
-        }
+        return 'text-black';
     };
 
     return (
-        <div className="relative w-full h-full bg-gradient-to-br from-zinc-900 to-black rounded-lg overflow-hidden border border-white/10">
-            {/* Simulated Camera Feed Background */}
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(0,255,255,0.03),transparent_70%)]" />
+        <div className="relative w-full h-full bg-transparent rounded-lg overflow-hidden border border-white/10 pointer-events-none">
 
             <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center">
@@ -69,30 +61,42 @@ export function AIDetectionOverlay({ detections, isConnected }: AIDetectionOverl
             {detections.map((detection, index) => (
                 <motion.div
                     key={detection.id}
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    transition={{ duration: 0.2, delay: index * 0.05 }}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{
+                        opacity: 1,
+                        scale: 1,
+                        left: detection.bbox_normalized
+                            ? `${detection.bbox_normalized[0] * 100}%`
+                            : `${(detection.bbox.x / 1280) * 100}%`,
+                        top: detection.bbox_normalized
+                            ? `${detection.bbox_normalized[1] * 100}%`
+                            : `${(detection.bbox.y / 720) * 100}%`,
+                        width: detection.bbox_normalized
+                            ? `${detection.bbox_normalized[2] * 100}%`
+                            : `${(detection.bbox.width / 1280) * 100}%`,
+                        height: detection.bbox_normalized
+                            ? `${detection.bbox_normalized[3] * 100}%`
+                            : `${(detection.bbox.height / 720) * 100}%`,
+                    }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    transition={{
+                        duration: 0.2,
+                        ease: "linear" // Smooth linear interpolation for tracking
+                    }}
                     className={cn(
-                        'absolute border-2 backdrop-blur-sm',
+                        'absolute border-2 backdrop-blur-[2px]',
                         getThreatColor(detection.threat_level)
                     )}
-                    style={{
-                        left: `${(detection.bbox.x / 1280) * 100}%`,
-                        top: `${(detection.bbox.y / 720) * 100}%`,
-                        width: `${(detection.bbox.width / 1280) * 100}%`,
-                        height: `${(detection.bbox.height / 720) * 100}%`,
-                    }}
                 >
                     {/* Label */}
                     <div
                         className={cn(
-                            'absolute -top-6 left-0 px-2 py-1 text-[10px] font-black uppercase tracking-wider rounded',
-                            getThreatColor(detection.threat_level),
+                            'absolute -top-6 left-0 px-2 py-1 text-[11px] font-bold uppercase tracking-wider rounded-sm shadow-sm',
+                            getThreatColor(detection.threat_level).replace('bg-', 'bg-').replace('/10', ''), // Make background solid for text
                             getTextColor(detection.threat_level)
                         )}
                     >
-                        {detection.class} {Math.round(detection.confidence * 100)}%
+                        {detection.class}
                     </div>
 
                     {/* Threat indicator for critical */}

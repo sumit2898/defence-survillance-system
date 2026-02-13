@@ -31,7 +31,12 @@ import { ThreatConsole } from '@/components/ThreatConsole';
 import { AIDetectionOverlay } from '@/components/AIDetectionOverlay';
 import { ThreatMap } from '@/components/ThreatMap';
 import { ModelSelector } from '@/components/ModelSelector';
+import { SensorFusion } from '@/components/SensorFusion';
+import { EdgeComputing } from '@/components/EdgeComputing';
 import { cn } from '@/lib/utils';
+import { SecurityScore } from '@/components/SecurityScore';
+import { GlitchText } from '@/components/GlitchText';
+import { SuspectsManager } from '@/components/SuspectsManager';
 
 interface AIStats {
     totalDetections: number;
@@ -52,6 +57,7 @@ interface Detection {
         width: number;
         height: number;
     };
+    bbox_normalized?: number[];
     threat_level: 'normal' | 'suspicious' | 'critical';
     timestamp: string;
 }
@@ -71,14 +77,13 @@ interface Alert {
     requires_action: boolean;
 }
 
-import { SecurityScore } from '@/components/SecurityScore';
-import { GlitchText } from '@/components/GlitchText';
-
 export default function AutonomousShield() {
     const [isConnected, setIsConnected] = useState(false);
     const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
     const [detections, setDetections] = useState<Detection[]>([]);
     const [alerts, setAlerts] = useState<Alert[]>([]);
+    const [fusionData, setFusionData] = useState<any>(null);
+    const [predictionData, setPredictionData] = useState<any>(null);
     const [stats, setStats] = useState<AIStats>({
         totalDetections: 0,
         criticalAlerts: 0,
@@ -87,6 +92,8 @@ export default function AutonomousShield() {
         fps: 20,
         latency: '<100ms'
     });
+
+    const [isSuspectsOpen, setIsSuspectsOpen] = useState(false);
 
     // Neural Terminal Simulation
     useEffect(() => {
@@ -108,35 +115,44 @@ export default function AutonomousShield() {
     useEffect(() => {
         // Connect to AI service WebSocket
         const connectWebSocket = () => {
-            const ws = new WebSocket(`ws://${window.location.hostname}:8000/api/ai/stream`);
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const ws = new WebSocket(`${protocol}//${window.location.hostname}:8000/api/ai/stream`);
 
             ws.onopen = () => {
                 console.log('🛡️ Connected to Autonomous Shield AI');
                 setIsConnected(true);
             };
 
+            let lastUpdate = 0;
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
+                const now = Date.now();
 
                 if (data.type === 'frame_analysis') {
+                    // 1. Detections MUST be real-time for overlay smooth tracking
                     setDetections(data.detections || []);
 
-                    // Update stats
-                    const critical = data.detections.filter((d: Detection) => d.threat_level === 'critical').length;
-                    const suspicious = data.detections.filter((d: Detection) => d.threat_level === 'suspicious').length;
-                    const normal = data.detections.filter((d: Detection) => d.threat_level === 'normal').length;
+                    // 2. Throttle Chart & Stats updates to avoid React render loops and Recharts overload (limit to ~10 FPS)
+                    if (now - lastUpdate > 100) {
+                        if (data.fusion) setFusionData(data.fusion);
+                        if (data.predictions) setPredictionData(data.predictions);
 
-                    setStats(prev => ({
-                        ...prev,
-                        totalDetections: prev.totalDetections + data.detections.length,
-                        criticalAlerts: prev.criticalAlerts + critical,
-                        suspiciousEvents: prev.suspiciousEvents + suspicious,
-                        normalActivity: prev.normalActivity + normal
-                    }));
+                        // Update stats logic
+                        setStats(prev => {
+                            return {
+                                ...prev,
+                                totalDetections: data.detections.length,
+                                criticalAlerts: data.detections.filter((d: Detection) => d.threat_level === 'critical').length,
+                                suspiciousEvents: data.detections.filter((d: Detection) => d.threat_level === 'suspicious').length,
+                                normalActivity: data.detections.filter((d: Detection) => d.threat_level === 'normal').length
+                            };
+                        });
+                        lastUpdate = now;
+                    }
                 }
 
                 if (data.type === 'critical_alert') {
-                    setAlerts(prev => [data.alert, ...prev].slice(0, 50)); // Keep last 50 alerts
+                    setAlerts(prev => [data.alert, ...prev].slice(0, 50));
                 }
 
                 if (data.type === 'SYSTEM_EVENT') {
@@ -220,28 +236,37 @@ export default function AutonomousShield() {
                                     <p className="text-[10px] text-zinc-500 font-mono tracking-[0.3em]">ACTIVE_INTELLIGENCE_CORE_v4.2</p>
                                     <div className="h-3 w-[1px] bg-white/10" />
                                     <p className="text-[10px] text-green-500 font-mono tracking-widest uppercase">
-                                        {isConnected ? 'SECURE_LINK_BSTABLISHED' : 'LINK_PENDING...'}
+                                        {isConnected ? 'SECURE_LINK_ESTABLISHED' : 'LINK_PENDING...'}
                                     </p>
                                 </div>
                             </div>
-                        </div>
+                            <div className="flex items-center gap-4">
+                                <button
+                                    onClick={() => setIsSuspectsOpen(true)}
+                                    className="px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-lg backdrop-blur-sm hover:bg-red-500/20 transition-all group"
+                                >
+                                    <span className="text-[10px] font-black text-red-400 uppercase tracking-wider flex items-center gap-2">
+                                        <Database className="w-3 h-3 group-hover:scale-110 transition-transform" />
+                                        MANAGE TARGETS
+                                    </span>
+                                </button>
 
-                        <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg">
-                                <div className={cn(
-                                    'w-2 h-2 rounded-full animate-pulse',
-                                    isConnected ? 'bg-green-500 shadow-[0_0_10px_#22c55e]' : 'bg-red-500'
-                                )} />
-                                <span className="text-[10px] font-mono text-white uppercase tracking-wider">
-                                    {isConnected ? 'SYSTEM ONLINE' : 'OFFLINE'}
-                                </span>
-                            </div>
+                                <div className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg">
+                                    <div className={cn(
+                                        'w-2 h-2 rounded-full animate-pulse',
+                                        isConnected ? 'bg-green-500 shadow-[0_0_10px_#22c55e]' : 'bg-red-500'
+                                    )} />
+                                    <span className="text-[10px] font-mono text-white uppercase tracking-wider">
+                                        {isConnected ? 'SYSTEM ONLINE' : 'OFFLINE'}
+                                    </span>
+                                </div>
 
-                            <div className="px-4 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-lg backdrop-blur-sm">
-                                <span className="text-[10px] font-black text-cyan-400 uppercase tracking-wider flex items-center gap-2">
-                                    <Cpu className="w-3 h-3" />
-                                    YOLOv8-NANO ACCELERATED
-                                </span>
+                                <div className="px-4 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-lg backdrop-blur-sm">
+                                    <span className="text-[10px] font-black text-cyan-400 uppercase tracking-wider flex items-center gap-2">
+                                        <Cpu className="w-3 h-3" />
+                                        YOLOv8-NANO ACCELERATED
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -366,6 +391,7 @@ export default function AutonomousShield() {
                             </div>
                         </motion.div>
                     </div>
+
                     {/* Top Section - Dashboard Grid */}
                     <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 p-4">
                         {/* Left Sidebar - System Vitals & Widgets */}
@@ -415,79 +441,28 @@ export default function AutonomousShield() {
                                 </div>
                             </motion.div>
 
-                            {/* Environmental Intel */}
+                            {/* Sensor Fusion / Environmental Intel */}
                             <motion.div
                                 initial={{ x: -20, opacity: 0 }}
                                 animate={{ x: 0, opacity: 1 }}
                                 transition={{ delay: 0.2 }}
                                 className="bg-black/40 border border-white/10 rounded-xl p-4 backdrop-blur-md"
                             >
-                                <div className="flex items-center gap-2 mb-4">
-                                    <Globe className="w-4 h-4 text-cyan-400" />
-                                    <h3 className="text-xs font-black text-white uppercase tracking-wider">
-                                        Sector Environment
-                                    </h3>
-                                </div>
-                                <div className="grid grid-cols-2 gap-3 mb-3">
-                                    <div className="bg-white/5 rounded p-2 flex flex-col items-center justify-center">
-                                        <Wind className="w-4 h-4 text-zinc-400 mb-1" />
-                                        <span className="text-lg font-bold text-white">12<span className="text-[9px] text-zinc-500 ml-0.5">KM/H</span></span>
-                                        <span className="text-[9px] text-zinc-500 uppercase">NW WIND</span>
-                                    </div>
-                                    <div className="bg-white/5 rounded p-2 flex flex-col items-center justify-center">
-                                        <Thermometer className="w-4 h-4 text-zinc-400 mb-1" />
-                                        <span className="text-lg font-bold text-white">24<span className="text-[9px] text-zinc-500 ml-0.5">°C</span></span>
-                                        <span className="text-[9px] text-zinc-500 uppercase">TEMP</span>
-                                    </div>
-                                    <div className="bg-white/5 rounded p-2 flex flex-col items-center justify-center">
-                                        <Droplets className="w-4 h-4 text-zinc-400 mb-1" />
-                                        <span className="text-lg font-bold text-white">45<span className="text-[9px] text-zinc-500 ml-0.5">%</span></span>
-                                        <span className="text-[9px] text-zinc-500 uppercase">HUMIDITY</span>
-                                    </div>
-                                    <div className="bg-white/5 rounded p-2 flex flex-col items-center justify-center">
-                                        <Activity className="w-4 h-4 text-zinc-400 mb-1" />
-                                        <span className="text-lg font-bold text-white">98<span className="text-[9px] text-zinc-500 ml-0.5">kPa</span></span>
-                                        <span className="text-[9px] text-zinc-500 uppercase">PRESSURE</span>
-                                    </div>
-                                </div>
+                                <SensorFusion />
                             </motion.div>
 
-                            {/* Network Link Status */}
+                            {/* Edge Computing Node Status */}
                             <motion.div
                                 initial={{ x: -20, opacity: 0 }}
                                 animate={{ x: 0, opacity: 1 }}
-                                transition={{ delay: 0.3 }}
-                                className="bg-black/40 border border-white/10 rounded-xl p-4 backdrop-blur-md"
+                                transition={{ delay: 0.4 }}
                             >
-                                <div className="flex items-center justify-between mb-2">
-                                    <div className="flex items-center gap-2">
-                                        <Wifi className="w-4 h-4 text-cyan-400" />
-                                        <h3 className="text-xs font-black text-white uppercase tracking-wider">UPLINK</h3>
-                                    </div>
-                                    <span className="text-[9px] font-mono text-green-400">1.2 GB/s STABLE</span>
-                                </div>
-                                <div className="h-24 w-full">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <AreaChart data={Array.from({ length: 15 }, (_, i) => ({ v: 50 + Math.random() * 40 }))}>
-                                            <defs>
-                                                <linearGradient id="colorNet" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3} />
-                                                    <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
-                                                </linearGradient>
-                                            </defs>
-                                            <Area type="monotone" dataKey="v" stroke="#06b6d4" fill="url(#colorNet)" strokeWidth={2} />
-                                        </AreaChart>
-                                    </ResponsiveContainer>
-                                </div>
+                                <EdgeComputing />
                             </motion.div>
-
-
-
                         </div>
 
-                        {/* Center - Live Feed + Map Split */}
+                        {/* Center - Visual Cortex */}
                         <div className="col-span-1 lg:col-span-6 flex flex-col gap-4 h-full">
-
                             {/* TOP: Visual Cortex (Live Feed) - 60% Height */}
                             <div className="flex-[3] relative bg-black/40 border border-white/10 rounded-2xl overflow-hidden backdrop-blur-md group">
                                 {/* Header Overlay */}
@@ -519,11 +494,6 @@ export default function AutonomousShield() {
                                         isConnected={isConnected}
                                     />
                                 </div>
-                            </div>
-
-                            {/* BOTTOM: Geospatial Intel (Map) - 40% Height */}
-                            <div className="flex-[2] relative bg-black/40 border border-white/10 rounded-2xl overflow-hidden backdrop-blur-md">
-                                <ThreatMap alerts={alerts} />
                             </div>
 
                             {/* MODULE SHOWCASE: Command Capabilities */}
@@ -588,8 +558,9 @@ export default function AutonomousShield() {
                                     </div>
                                 </div>
                             </div>
-
                         </div>
+
+                        {/* Right Sidebar - Deployed Units */}
                         <div className="col-span-1 lg:col-span-3 flex flex-col gap-4">
                             {/* Active Units List */}
                             <div className="bg-black/40 border border-white/10 rounded-xl p-4 backdrop-blur-md">
@@ -615,69 +586,35 @@ export default function AutonomousShield() {
                                     ))}
                                 </div>
                             </div>
-
-                            <div className="flex-1 bg-black/40 border border-white/10 rounded-xl overflow-hidden backdrop-blur-md">
-                                <ThreatConsole alerts={alerts} />
-                            </div>
-
-                            {/* Neural Terminal */}
-                            <div className="h-32 bg-black/80 border-t border-cyan-500/20 p-2 font-mono text-[10px] overflow-hidden relative">
-                                <div className="absolute top-0 left-0 right-0 h-4 bg-gradient-to-b from-black to-transparent pointer-events-none z-10" />
-                                <div className="flex items-center gap-2 mb-2 text-cyan-500 border-b border-white/10 pb-1">
-                                    <Terminal className="w-3 h-3" />
-                                    <span className="font-bold tracking-wider">SENTIENT_LINK_V4</span>
-                                </div>
-                                <div className="flex flex-col gap-1 opacity-80">
-                                    {terminalLogs.map((log, i) => (
-                                        <motion.div
-                                            key={i}
-                                            initial={{ opacity: 0, x: -10 }}
-                                            animate={{ opacity: 1 - (i * 0.15), x: 0 }}
-                                            className="text-cyan-400/80 truncate"
-                                        >
-                                            <span className="text-zinc-600 mr-2">{'>'}</span>
-                                            {log}
-                                        </motion.div>
-                                    ))}
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>
             </div>
+
+            <SuspectsManager
+                isOpen={isSuspectsOpen}
+                onClose={() => setIsSuspectsOpen(false)}
+            />
         </Layout>
     );
 }
 
-// Stat Card Component
-function StatCard({
-    label,
-    value,
-    icon: Icon,
-    trend
-}: {
-    label: string;
-    value: string;
-    icon: any;
-    trend: 'success' | 'warning' | 'critical' | 'neutral';
-}) {
-    const colors = {
-        success: 'text-green-400 border-green-500/30 bg-green-500/10',
-        warning: 'text-yellow-400 border-yellow-500/30 bg-yellow-500/10',
-        critical: 'text-red-400 border-red-500/30 bg-red-500/10',
-        neutral: 'text-cyan-400 border-cyan-500/30 bg-cyan-500/10'
-    };
-
+function StatCard({ label, value, icon: Icon, trend }: { label: string, value: string, icon: any, trend: 'neutral' | 'success' | 'warning' | 'critical' }) {
     return (
-        <div className={cn(
-            'p-3 border rounded-lg',
-            colors[trend]
-        )}>
-            <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] text-zinc-500 uppercase tracking-widest">{label}</span>
-                <Icon className="w-3 h-3" />
+        <div className="bg-white/5 border border-white/10 rounded-lg p-3 flex items-center justify-between group hover:border-white/20 transition-all">
+            <div>
+                <p className="text-[9px] text-zinc-400 font-bold tracking-wider uppercase mb-1">{label}</p>
+                <div className="text-lg font-black text-white tracking-tight">{value}</div>
             </div>
-            <div className="text-xl font-black font-mono">{value}</div>
+            <div className={cn(
+                "w-8 h-8 rounded-lg flex items-center justify-center border transition-all",
+                trend === 'success' && "bg-green-500/10 border-green-500/20 text-green-400 group-hover:scale-110",
+                trend === 'warning' && "bg-amber-500/10 border-amber-500/20 text-amber-400 group-hover:scale-110",
+                trend === 'critical' && "bg-red-500/10 border-red-500/20 text-red-400 group-hover:scale-110 animate-pulse",
+                trend === 'neutral' && "bg-cyan-500/10 border-cyan-500/20 text-cyan-400 group-hover:scale-110"
+            )}>
+                <Icon className="w-4 h-4" />
+            </div>
         </div>
     );
 }

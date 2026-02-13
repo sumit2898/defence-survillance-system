@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import { motion } from 'framer-motion';
 import { AlertTriangle, MapPin } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { PredictiveThreats } from '@/components/PredictiveThreats';
 
 interface Alert {
     alert_id: string;
@@ -21,9 +22,10 @@ interface Alert {
 
 interface ThreatMapProps {
     alerts: Alert[];
+    predictions?: any[];
 }
 
-export function ThreatMap({ alerts }: ThreatMapProps) {
+export function ThreatMap({ alerts, predictions }: ThreatMapProps) {
     const [geoJsonData, setGeoJsonData] = useState<any>(null);
 
     // Default center (India)
@@ -126,6 +128,9 @@ export function ThreatMap({ alerts }: ThreatMapProps) {
                         }}
                     />
                 )}
+
+                {/* Predictive Threats Layer */}
+                {predictions && <PredictiveThreats predictions={predictions} />}
 
                 {/* Threat Markers */}
                 {alerts.map((alert) => (

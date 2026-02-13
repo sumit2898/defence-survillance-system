@@ -1,5 +1,6 @@
 import { useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { AIDetectionOverlay } from './AIDetectionOverlay';
 
 interface LiveFeedProps {
     isActive: boolean;
@@ -25,7 +26,7 @@ export function LiveFeed({ isActive, detections, processingStats }: LiveFeedProp
             {isActive ? (
                 <img
                     src={`http://${window.location.hostname}:8000/api/ai/video_feed`}
-                    className="w-full h-full object-cover opacity-80"
+                    className="w-full h-full object-fill opacity-80"
                     alt="Live Neural Feed"
                 />
             ) : (
@@ -44,6 +45,11 @@ export function LiveFeed({ isActive, detections, processingStats }: LiveFeedProp
 
             {/* Post-processing effects */}
             <div className="absolute inset-0 pointer-events-none mix-blend-overlay bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
+
+            {/* AI Detection Overlay */}
+            <div className="absolute inset-0 z-10">
+                <AIDetectionOverlay detections={detections} isConnected={isActive} />
+            </div>
 
             {!isActive && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/90 z-20">

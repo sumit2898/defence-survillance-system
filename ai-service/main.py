@@ -1,23 +1,20 @@
-"""
-AI Service - Main Entry Point
-FastAPI backend for AI-based threat detection
-Provides real-time object detection via WebSocket and REST API
-"""
-
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import asyncio
 import json
+import cv2
 from datetime import datetime
 from typing import List, Dict
+import time
 import uvicorn
 from fastapi.responses import StreamingResponse
 import io
-import cv2
 
 from mock_detector import MockDetector, ThreatLevel
 from model_manager import get_model_manager, ModelType
+from mock_fusion import MockFusionEngine
+from prediction_engine import ThreatPredictor
 
 # Try to import Vision Engine
 try:
@@ -45,6 +42,7 @@ app.add_middleware(
 )
 
 import os
+from fastapi.staticfiles import StaticFiles
 
 # ==============================================================================
 # CONFIGURATION
@@ -57,12 +55,30 @@ try:
     VIDEO_SOURCE = int(env_source)
 except ValueError:
     VIDEO_SOURCE = env_source
+# Fallback for some systems if needed, but prioritizing env var
+if VIDEO_SOURCE == "0": VIDEO_SOURCE = 0
 
 # Global instances
 detector = MockDetector(frame_width=1280, frame_height=720)
+fusion_engine = MockFusionEngine()
+predictor = ThreatPredictor()
 vision_engine = None
 using_real_vision = False
 model_manager = None  # Will be initialized on startup
+
+print(f"🔧 CONFIG: VISION_AVAILABLE={VISION_AVAILABLE}", flush=True)
+print(f"🔧 CONFIG: VIDEO_SOURCE={VIDEO_SOURCE}", flush=True)
+
+if VISION_AVAILABLE:
+    try:
+        print("🚀 Initializing Vision Engine...", flush=True)
+        vision_engine = VisionEngine(source=VIDEO_SOURCE)
+        vision_engine.start()
+        using_real_vision = True
+        print("✅ Vision Engine Started", flush=True)
+    except Exception as e:
+         print(f"❌ Failed to start Vision Engine: {e}", flush=True)
+         using_real_vision = False
 
 class ConnectionManager:
     def __init__(self):
@@ -341,6 +357,56 @@ def video_feed():
     
     return StreamingResponse(generate_frames(), media_type="multipart/x-mixed-replace; boundary=frame")
 
+# ==============================================================================
+# SUSPECT MANAGEMENT API
+# ==============================================================================
+import os
+import shutil
+from fastapi import UploadFile, File
+
+KNOWN_FACES_DIR = "assets/known_faces"
+os.makedirs(KNOWN_FACES_DIR, exist_ok=True)
+
+# Mount static files to serve images
+app.mount("/api/suspects/image", StaticFiles(directory=KNOWN_FACES_DIR), name="suspects")
+
+@app.get("/api/suspects")
+def list_suspects():
+    """List all registered suspects"""
+    files = []
+    if os.path.exists(KNOWN_FACES_DIR):
+        for f in os.listdir(KNOWN_FACES_DIR):
+            if f.endswith(('.jpg', '.jpeg', '.png')):
+                files.append(f)
+    return {"suspects": files}
+
+@app.post("/api/suspects")
+async def upload_suspect(file: UploadFile = File(...)):
+    """Upload a new suspect image"""
+    file_path = os.path.join(KNOWN_FACES_DIR, file.filename)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    
+    # Trigger reload if vision engine is active
+    if vision_engine and vision_engine.face_recognizer:
+        vision_engine.face_recognizer.reload()
+        
+    return {"status": "uploaded", "filename": file.filename}
+
+@app.delete("/api/suspects/{filename}")
+def delete_suspect(filename: str):
+    """Delete a suspect"""
+    file_path = os.path.join(KNOWN_FACES_DIR, filename)
+    if os.path.exists(file_path):
+        os.remove(file_path)
+        
+        # Trigger reload
+        if vision_engine and vision_engine.face_recognizer:
+            vision_engine.face_recognizer.reload()
+            
+        return {"status": "deleted", "filename": filename}
+    return JSONResponse(status_code=404, content={"error": "File not found"})
+
 # WebSocket for real-time AI metadata
 @app.websocket("/api/ai/stream")
 async def websocket_stream(websocket: WebSocket):
@@ -381,7 +447,9 @@ async def websocket_stream(websocket: WebSocket):
                 "frame_id": current_frame_id,
                 "detections": detections,
                 "mode": "real" if using_real_vision else "mock",
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
+                "fusion": fusion_engine.update(),
+                "predictions": predictor.predict_risks() if frame_count % 300 == 0 else None # Update predictions every ~10s
             }
             
             await websocket.send_json(frame_data)
