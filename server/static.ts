@@ -4,7 +4,7 @@ import path from "path";
 
 export function serveStatic(app: Express) {
   // Use process.cwd() since we always run from root via npm scripts
-  const distPath = path.resolve(process.cwd(), "dist/public");
+  const distPath = path.resolve(process.cwd(), "dist");
 
   console.log(`📂 Serving static files from: ${distPath}`);
 
